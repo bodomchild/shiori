@@ -21,7 +21,9 @@ export default function TripPage() {
         <div className="hero-meta"><span>13 oct — 4 nov</span><span>{totalDays} días</span><span>6 ciudades</span></div>
         <div className="hero-actions">
           <Link className="primary-link" to={tripDayPath(current.tripDay)}>{currentLabel} <span aria-hidden="true">→</span></Link>
-          <a className="secondary-link" href="#todos-los-dias">Ver todos los días</a>
+          <button className="secondary-link" type="button" onClick={() => {
+            document.getElementById('todos-los-dias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}>Ver todos los días</button>
         </div>
       </div>
       <div className="japan-art" aria-hidden="true">
