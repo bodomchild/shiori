@@ -4,6 +4,8 @@ Una web estática para consultar el viaje del 13 de octubre al 4 de noviembre.
 React + TypeScript + Vite, React Router, Tailwind CSS y Leaflet. Sin backend,
 cuentas ni base de datos.
 
+Versión publicada: <https://bodomchild.github.io/shiori/>
+
 ## Ejecutar
 
 Requiere Node **22.12 o superior dentro de 22 LTS**, o **24 LTS**, y npm 10+.
@@ -29,7 +31,9 @@ npm run preview
 
 El build genera `dist/`. Usa rutas con hash (`/#/osaka/14-10`) y rutas de assets
 relativas para que funcione en alojamiento estático, incluso en una subcarpeta.
-No requiere reglas de redirección. No hay ningún despliegue configurado.
+No requiere reglas de redirección. El workflow `.github/workflows/deploy.yml`
+publica `dist/` en GitHub Pages después de cada push a `main`; también puede
+ejecutarse manualmente desde la pestaña Actions del repositorio.
 
 ## Datos y uso
 
