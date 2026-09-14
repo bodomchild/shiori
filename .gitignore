@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.local
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.tsbuildinfo
+# Local reference documents are read-only and should not be published.
+references/
