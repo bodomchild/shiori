@@ -32,6 +32,7 @@ main:focus { outline: none; }
 .hero-description { font-size: 14px; line-height: 1.7; color: #686c61; }
 .hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 11px; margin-top: 25px; color: #565e51; }
 .hero-meta span + span { border-left: 1px solid #cecec2; padding-left: 12px; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .japan-art { display: none; }
 .section-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin: 14px 0 22px; }
 .section-heading .eyebrow { margin-bottom: 8px; }
@@ -50,6 +51,24 @@ main:focus { outline: none; }
 .city-card p span { white-space: nowrap; }
 .circle-arrow { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #9ca68f; border-radius: 50%; font-size: 19px; flex-shrink: 0; color: #4a5940; }
 .sample-note { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; border-top: 1px solid #ddded3; padding-block: 24px 10px; }
+.trip-days { scroll-margin-top: 16px; padding-block: 30px 36px; border-top: 1px solid #ddded3; }
+.trip-day-groups { display: grid; gap: 16px; }
+.trip-day-group { overflow: hidden; border: 1px solid #dddfd3; border-radius: 6px; background: #fcfbf7; }
+.trip-day-city { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 16px; background: #eceee5; border-bottom: 1px solid #dddfd3; }
+.trip-day-city > div { display: flex; align-items: baseline; gap: 12px; }
+.trip-day-city h3 { margin: 0; font: 400 23px Georgia, serif; }
+.trip-day-city > a { min-height: 44px; display: inline-flex; align-items: center; gap: 9px; color: #59674f; font-size: 11px; }
+.quick-day-list { display: grid; }
+.quick-day { display: grid; grid-template-columns: 48px minmax(0, 1fr) 20px; align-items: center; gap: 12px; min-height: 72px; padding: 10px 14px; border-bottom: 1px solid #e6e6dd; }
+.quick-day:last-child { border-bottom: 0; }
+.quick-day:hover { background: #f4f2eb; }
+.quick-day time { display: grid; justify-items: center; border-right: 1px solid #dedfd5; padding-right: 12px; text-transform: uppercase; }
+.quick-day time span { font-size: 9px; letter-spacing: .8px; color: #747a6c; }
+.quick-day time strong { color: #ad3d30; font: 400 24px Georgia, serif; }
+.quick-day-copy { min-width: 0; }
+.quick-day-copy > strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.quick-day-copy small { display: block; margin-top: 5px; color: #6a7163; font-size: 10px; }
+.quick-day-arrow { color: #697660; font-size: 17px; }
 .note-symbol { font-size: 26px; color: #ad3d30; }
 .sample-note > div { flex: 1; min-width: 200px; }
 .sample-note strong { font-size: 13px; font-weight: 600; }
@@ -64,12 +83,21 @@ main:focus { outline: none; }
 .days-grid { display: grid; gap: 12px; margin-block: 30px 60px; }
 .day-card { display: flex; align-items: center; gap: 18px; padding: 18px 14px; border: 1px solid #dddfd3; border-radius: 6px; background: #fcfbf7; }
 .day-card:hover { border-color: #8d997f; }
+.day-card.is-today { border-color: #ad3d30; box-shadow: inset 3px 0 #ad3d30; }
+.today-badge { display: inline-block; margin-left: 5px; padding: 2px 5px; border-radius: 3px; color: #fff; background: #ad3d30; font-size: 9px; text-transform: uppercase; }
 .calendar-block { text-align: center; width: 51px; flex-shrink: 0; border-right: 1px solid #e1e1d7; padding-right: 14px; }
 .calendar-block span { text-transform: uppercase; font-size: 10px; color: #747a6c; display: block; letter-spacing: 1px; }
 .calendar-block strong { color: #ad3d30; font: 400 32px Georgia, serif; }
 .day-card h2 { text-transform: capitalize; font-weight: 600; font-size: 16px; margin: 0 0 6px; }
 .day-card p { font-size: 11px; color: #686f60; margin: 0; }
 .day-heading { display: flex; flex-direction: column; gap: 22px; }
+.day-navigation { display: grid; grid-template-columns: minmax(82px, 1fr) auto minmax(82px, 1fr); align-items: center; gap: 8px; margin: -4px 0 22px; padding: 8px; border: 1px solid #dddfd3; border-radius: 6px; background: #fcfbf7; }
+.day-navigation a { display: flex; align-items: center; gap: 8px; min-height: 44px; color: #4d5f42; }
+.day-navigation a:last-child { justify-content: flex-end; text-align: right; }
+.day-navigation a small, .day-navigation a strong { display: block; }
+.day-navigation a small { margin-bottom: 2px; color: #747a6c; font-size: 8px; letter-spacing: .8px; text-transform: uppercase; }
+.day-navigation a strong { font-size: 11px; text-transform: capitalize; }
+.day-position { color: #717767; font-size: 9px; letter-spacing: .8px; white-space: nowrap; }
 .day-heading .eyebrow { font-size: 10px; }
 .day-heading .page-title { font-size: clamp(31px, 3.5vw, 43px); }
 .day-note { max-width: 720px; margin: 12px 0 0; font-size: 12px; line-height: 1.65; color: #676e61; }
@@ -132,6 +160,7 @@ main:focus { outline: none; }
   .city-card { min-height: 180px; }
   .hero-copy h1 { font-size: 58px; }
   .days-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trip-day-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
 
 @media (min-width: 900px) {
@@ -157,6 +186,8 @@ main:focus { outline: none; }
   .city-character { font-size: 38px; }
   .section-heading h2 { font-size: 32px; }
   .day-heading { flex-direction: row; justify-content: space-between; align-items: flex-end; }
+  .day-navigation { grid-template-columns: 1fr auto 1fr; padding-inline: 14px; }
+  .trip-day-groups { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .day-selectors { width: 310px; flex-shrink: 0; }
   .day-layout { grid-template-columns: minmax(0, 1.2fr) minmax(340px, 1fr); gap: 28px; }
   .map-panel { top: 20px; box-shadow: none; }

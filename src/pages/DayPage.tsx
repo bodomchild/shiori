@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { itinerary } from '../data/itinerary';
-import { cityDates, daySlug, formatDate } from '../dates';
+import { cityDates, daySlug, formatDate, tripDayPath, tripDays } from '../dates';
 import type { City, Day, ItineraryStop } from '../types/itinerary';
 import NotFound from '../components/NotFound';
 import DaySelector from '../components/DaySelector';
@@ -13,6 +13,10 @@ function DayView({ city, day }: { city: City; day: Day }) {
   const selectedStopId = selectedStop?.id ?? null;
   const stops = day.stops;
   const mappedStops = stops.filter((stop) => stop.coordinates);
+  const allDays = tripDays(itinerary);
+  const dayIndex = allDays.findIndex((entry) => entry.city.id === city.id && entry.date === day.date);
+  const previousDay = allDays[dayIndex - 1];
+  const nextDay = allDays[dayIndex + 1];
 
   function selectStop(id: string) {
     const stop = stops.find((entry) => entry.id === id);
@@ -30,6 +34,11 @@ function DayView({ city, day }: { city: City; day: Day }) {
 
   return <div className="page-shell day-page">
     <Link className="back-link" to={`/${city.id}`}>← Días en {city.name}</Link>
+    <nav className="day-navigation" aria-label="Navegación entre días del viaje">
+      {previousDay ? <Link to={tripDayPath(previousDay)} rel="prev"><span aria-hidden="true">←</span><span><small>Anterior</small><strong>{formatDate(previousDay.date, { day: 'numeric', month: 'short' })}</strong></span></Link> : <span />}
+      <span className="day-position">DÍA {dayIndex + 1} DE {allDays.length}</span>
+      {nextDay ? <Link to={tripDayPath(nextDay)} rel="next"><span><small>Siguiente</small><strong>{formatDate(nextDay.date, { day: 'numeric', month: 'short' })}</strong></span><span aria-hidden="true">→</span></Link> : <span />}
+    </nav>
     <div className="day-heading"><div><p className="eyebrow">{city.name} · {formatDate(day.date, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1 className="page-title">{day.title}</h1>{day.notes && <p className="day-note">{day.notes}</p>}</div><DaySelector city={city} date={day.date} /></div>
     {stops.length > 0 ? <>
       <div className="day-info"><span><span className="red-dot" /> {stops.length} actividades · Horarios de Japón</span><span className="source-badge">Itinerario real</span></div>

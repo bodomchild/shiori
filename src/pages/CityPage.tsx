@@ -1,12 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
 import { itinerary } from '../data/itinerary';
-import { cityDates, daySlug, formatDate } from '../dates';
+import { cityDates, daySlug, formatDate, japanToday } from '../dates';
 import NotFound from '../components/NotFound';
 
 export default function CityPage() {
   const { cityId } = useParams();
   const city = itinerary.cities.find((entry) => entry.id === cityId);
   if (!city) return <NotFound />;
+  const today = japanToday();
 
   return <div className="page-shell city-page">
     <Link className="back-link" to="/">← Todo el viaje</Link>
@@ -16,9 +17,10 @@ export default function CityPage() {
     <div className="days-grid">
       {cityDates(city).map((date) => {
         const stops = city.days.find((day) => day.date === date)?.stops ?? [];
-        return <Link to={`/${city.id}/${daySlug(date)}`} className="day-card" key={date}>
+        const isToday = date === today;
+        return <Link to={`/${city.id}/${daySlug(date)}`} className={`day-card${isToday ? ' is-today' : ''}`} key={date}>
           <div className="calendar-block"><span>{formatDate(date, { month: 'short' })}</span><strong>{date.slice(8)}</strong></div>
-          <div className="min-w-0 flex-1"><h2>{city.days.find((day) => day.date === date)?.title ?? formatDate(date, { weekday: 'long' })}</h2><p>{formatDate(date, { weekday: 'long' })} · {stops.length} actividades</p></div>
+          <div className="min-w-0 flex-1"><h2>{city.days.find((day) => day.date === date)?.title ?? formatDate(date, { weekday: 'long' })}</h2><p>{formatDate(date, { weekday: 'long' })} · {stops.length} actividades {isToday && <span className="today-badge">Hoy</span>}</p></div>
           <span className="circle-arrow" aria-hidden="true">→</span>
         </Link>;
       })}
