@@ -72,16 +72,21 @@ main:focus { outline: none; }
 .day-heading { display: flex; flex-direction: column; gap: 22px; }
 .day-heading .eyebrow { font-size: 10px; }
 .day-heading .page-title { font-size: clamp(31px, 3.5vw, 43px); }
+.day-note { max-width: 720px; margin: 12px 0 0; font-size: 12px; line-height: 1.65; color: #676e61; }
 .day-selectors { display: flex; gap: 10px; }
 .day-selectors label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .day-selectors label > span { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #636b5a; font-weight: 600; }
 .day-selectors select { width: 100%; min-height: 44px; border: 1px solid #cdd2c2; border-radius: 5px; background: #fcfbf7; padding: 0 10px; color: #394430; font-size: 13px; }
 .day-info { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-block: 20px 15px; font-size: 11px; color: #626d58; }
 .day-info > span:first-child { display: flex; gap: 8px; align-items: center; }
-.mock-badge { padding: 5px 9px; color: #785628; background: #eee6d6; border-radius: 4px; font-size: 10px; }
+.source-badge { padding: 5px 9px; color: #42573a; background: #e4eadf; border-radius: 4px; font-size: 10px; }
 .day-layout { display: grid; gap: 25px; align-items: start; }
 .map-panel { overflow: hidden; border-radius: 6px; border: 1px solid #d8decd; background: #fcfbf7; }
 .map-wrapper { position: relative; scroll-margin-top: 12px; }
+.map-placeholder { min-height: 270px; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 28px; text-align: center; color: #5c6753; background: linear-gradient(145deg, #e5e9dc, #f2f1e9); }
+.map-placeholder > span { font: 400 38px Georgia, serif; color: #a83e31; }
+.map-placeholder strong { font: 400 22px Georgia, serif; color: #384532; }
+.map-placeholder p { max-width: 340px; margin: 0; font-size: 12px; line-height: 1.6; }
 .day-map { height: clamp(270px, 40svh, 410px); width: 100%; z-index: 0; background: #e6e9dd; font-family: var(--font-sans); }
 .map-caption { display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 10px 14px; font-size: 11px; color: #606c54; }
 .map-caption p { margin: 0; }
@@ -156,7 +161,7 @@ main:focus { outline: none; }
   .map-panel { position: sticky; top: 20px; }
   .day-map { height: clamp(420px, 65vh, 660px); }
   .day-info { margin-top: 26px; }
-  .day-info .mock-badge { margin-right: 1px; }
+  .day-info .source-badge { margin-right: 1px; }
   .city-page, .day-page { padding-top: 24px; }
   .days-grid { margin-top: 40px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .day-card { padding: 22px 17px; gap: 14px; }

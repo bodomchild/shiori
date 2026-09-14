@@ -27,6 +27,6 @@ export default function TripPage() {
         </Link>)}
       </div>
     </section>
-    <aside className="sample-note"><span className="note-symbol" aria-hidden="true">栞</span><div><strong>Un primer vistazo al viaje</strong><p>Por ahora, Osaka 14/10 y Kioto 18/10 tienen actividades de ejemplo. El itinerario definitivo todavía está por cargar.</p></div><Link to={`/osaka/${daySlug('2026-10-14')}`} className="text-link">Ver un día <span aria-hidden="true">→</span></Link></aside>
+    <aside className="sample-note"><span className="note-symbol" aria-hidden="true">栞</span><div><strong>El itinerario ya está con nosotros</strong><p>Los 23 días están cargados desde nuestra copia local, con horarios, actividades opcionales y ubicaciones confirmadas en el mapa.</p></div><Link to={`/osaka/${daySlug('2026-10-13')}`} className="text-link">Empezar el viaje <span aria-hidden="true">→</span></Link></aside>
   </div>;
 }

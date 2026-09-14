@@ -18,7 +18,7 @@ export default function CityPage() {
         const stops = city.days.find((day) => day.date === date)?.stops ?? [];
         return <Link to={`/${city.id}/${daySlug(date)}`} className="day-card" key={date}>
           <div className="calendar-block"><span>{formatDate(date, { month: 'short' })}</span><strong>{date.slice(8)}</strong></div>
-          <div className="min-w-0 flex-1"><h2>{formatDate(date, { weekday: 'long' })}</h2><p>{stops.length ? `${stops.length} paradas · Datos de ejemplo` : 'Sin actividades cargadas'}</p></div>
+          <div className="min-w-0 flex-1"><h2>{city.days.find((day) => day.date === date)?.title ?? formatDate(date, { weekday: 'long' })}</h2><p>{formatDate(date, { weekday: 'long' })} · {stops.length} actividades</p></div>
           <span className="circle-arrow" aria-hidden="true">→</span>
         </Link>;
       })}

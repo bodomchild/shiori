@@ -13,14 +13,16 @@ export interface City {
 
 export interface Day {
   date: string; // YYYY-MM-DD, fecha local de Japón
+  title: string;
+  notes?: string;
   stops: ItineraryStop[];
 }
 
 export interface ItineraryStop {
   id: string;
   name: string;
-  coordinates: [latitude: number, longitude: number];
-  startTime: string; // HH:mm, hora local de Japón
+  coordinates?: [latitude: number, longitude: number];
+  startTime?: string; // HH:mm, hora local de Japón
   duration?: number; // minutos
   category: 'visita' | 'comida' | 'traslado' | 'descanso';
   notes?: string;

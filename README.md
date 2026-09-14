@@ -7,9 +7,9 @@ cuentas ni base de datos.
 ## Ejecutar
 
 Requiere Node **22.12 o superior dentro de 22 LTS**, o **24 LTS**, y npm 10+.
-Verificado con Node **22.19.0** y npm **10.9.3**. Esa instalación es compatible;
-conviene mantener Node 22 actualizado al último parche de su rama LTS.
-No hace falta actualizar npm por separado ni usar la última versión mayor.
+Verificado con Node **24.21.0** y npm **11.19.0** mediante instalación limpia
+(`npm ci`) y build de producción. También se verificó con Node **22.19.0** y
+npm **10.9.3**. No hace falta cambiar dependencias al pasar de Node 22 a 24.
 
 ```sh
 npm ci
@@ -34,9 +34,10 @@ No requiere reglas de redirección. No hay ningún despliegue configurado.
 ## Datos y uso
 
 - `src/types/itinerary.ts`: modelo `Trip → City → Day → ItineraryStop`.
-- `src/data/itinerary.ts`: representación propia del viaje. **Solo Osaka 14/10 y
-  Kioto 18/10 tienen actividades mock**, con coordenadas y horarios aproximados.
-  El año **2026 es provisional**. El resto de las fechas muestra un estado vacío.
+- `src/data/itinerary.ts`: representación propia de los **23 días del viaje**, con
+  203 actividades extraídas de la copia local del documento fuente. El año es 2026.
+  Incluye horarios, notas, opciones y coordenadas estáticas cuando se confirmó un
+  lugar concreto. Los puntos todavía abiertos permanecen claramente indicados.
 - `src/pages/`: viaje completo, días de una ciudad y cronograma del día.
 - `src/components/`: selector de ciudad/día, mapa y lista de paradas.
 - `src/dates.ts`: operaciones pequeñas con fechas, independientes de la zona
@@ -55,6 +56,10 @@ modificarse, sobrescribirse, reorganizarse ni borrarse. Si se agrega una copia
 local, guardarla en `references/` (excluida de Git), usarla solo como fuente y
 editar únicamente la representación propia en `src/data/itinerary.ts`.
 La aplicación no accede a Google Drive ni sincroniza documentos.
+
+Se guardó una copia local de referencia en `references/viaje-japon.txt`, junto
+con la estructura y metadatos en `references/viaje-japon.source.json`. Estos
+archivos no se publican en Git ni se incluyen en el build.
 
 ## Git
 

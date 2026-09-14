@@ -11,7 +11,8 @@ import StopList from '../components/StopList';
 function DayView({ city, day }: { city: City; day: Day }) {
   const [selectedStop, setSelectedStop] = useState<ItineraryStop | null>(null);
   const selectedStopId = selectedStop?.id ?? null;
-  const stops = [...day.stops].sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const stops = day.stops;
+  const mappedStops = stops.filter((stop) => stop.coordinates);
 
   function selectStop(id: string) {
     const stop = stops.find((entry) => entry.id === id);
@@ -29,26 +30,26 @@ function DayView({ city, day }: { city: City; day: Day }) {
 
   return <div className="page-shell day-page">
     <Link className="back-link" to={`/${city.id}`}>← Días en {city.name}</Link>
-    <div className="day-heading"><div><p className="eyebrow">{formatDate(day.date, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1 className="page-title">Hoy recorremos {city.name}.</h1></div><DaySelector city={city} date={day.date} /></div>
+    <div className="day-heading"><div><p className="eyebrow">{city.name} · {formatDate(day.date, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1 className="page-title">{day.title}</h1>{day.notes && <p className="day-note">{day.notes}</p>}</div><DaySelector city={city} date={day.date} /></div>
     {stops.length > 0 ? <>
-      <div className="day-info"><span><span className="red-dot" /> {stops.length} paradas · Horarios de Japón</span><span className="mock-badge">Día de ejemplo</span></div>
+      <div className="day-info"><span><span className="red-dot" /> {stops.length} actividades · Horarios de Japón</span><span className="source-badge">Itinerario real</span></div>
       <div className="day-layout">
         <section className="map-panel" aria-label={`Mapa del ${formatDate(day.date)} en ${city.name}`}>
-          <DayMap stops={stops} selectedStop={selectedStop} onSelect={selectFromMap} />
-          <div className="map-caption"><span className="red-dot" /><p aria-live="polite">{selectedStop ? selectedStop.name : 'Tocá una parada para ubicarla en el mapa'}</p></div>
+          {mappedStops.length ? <DayMap stops={stops} selectedStop={selectedStop} onSelect={selectFromMap} /> : <div id="day-map" className="map-placeholder"><span aria-hidden="true">地図</span><strong>Ubicaciones por confirmar</strong><p>Este día ya tiene actividades, pero la fuente todavía no define lugares concretos para el mapa.</p></div>}
+          <div className="map-caption"><span className="red-dot" /><p aria-live="polite">{selectedStop ? selectedStop.coordinates ? selectedStop.name : `${selectedStop.name} · sin ubicación confirmada` : mappedStops.length ? `${mappedStops.length} ubicaciones · tocá una actividad para encontrarla` : 'El cronograma sigue disponible debajo'}</p></div>
         </section>
         <section className="itinerary-panel" aria-labelledby="stops-title">
           <div className="list-heading"><h2 id="stops-title">El plan del día</h2><span className="small-muted">PASO A PASO</span></div>
           <StopList stops={stops} selectedStopId={selectedStopId} onSelect={(id) => {
             selectStop(id);
-            if (window.matchMedia('(max-width: 899px)').matches) {
+            if (stops.find((stop) => stop.id === id)?.coordinates && window.matchMedia('(max-width: 899px)').matches) {
               document.getElementById('day-map')?.scrollIntoView({ block: 'start', behavior: 'instant' });
             }
           }} />
           <p className="list-footnote">Los horarios son aproximados. Siempre hay lugar para cambiar de plan.</p>
         </section>
       </div>
-    </> : <section className="empty-day"><span className="empty-symbol" aria-hidden="true">栞</span><h2>Un día por descubrir.</h2><p>Todavía no hay actividades cargadas para esta fecha.</p><p>Podés explorar los días de ejemplo mientras armamos el resto.</p><div className="flex flex-wrap justify-center gap-3 mt-6"><Link className="primary-link" to="/osaka/14-10">Osaka · 14 oct →</Link><Link className="secondary-link" to="/kyoto/18-10">Kioto · 18 oct →</Link></div></section>}
+    </> : <section className="empty-day"><span className="empty-symbol" aria-hidden="true">栞</span><h2>Un día por descubrir.</h2><p>Todavía no hay actividades cargadas para esta fecha.</p></section>}
   </div>;
 }
 
@@ -57,7 +58,7 @@ export default function DayPage() {
   const city = itinerary.cities.find((entry) => entry.id === cityId);
   const date = city && cityDates(city).find((entry) => daySlug(entry) === dayId);
   if (!city || !date) return <NotFound />;
-  const day = city.days.find((entry) => entry.date === date) ?? { date, stops: [] };
+  const day = city.days.find((entry) => entry.date === date) ?? { date, title: `Día en ${city.name}`, stops: [] };
   // Remount on navigation to reset both selection and Leaflet's viewport.
   return <DayView key={`${city.id}/${date}`} city={city} day={day} />;
 }
