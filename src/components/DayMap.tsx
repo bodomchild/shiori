@@ -34,7 +34,12 @@ export default function DayMap({ stops, selectedStop, onSelect }: Props) {
   const firstMappedStop = stops.find((stop): stop is ItineraryStop & { coordinates: [number, number] } => Boolean(stop.coordinates))!;
   return <div id="day-map" className="map-wrapper">
     <MapContainer center={firstMappedStop.coordinates} zoom={13} scrollWheelZoom={false} className="day-map" zoomAnimation={false} markerZoomAnimation={false}>
-      <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' eventHandlers={{ tileerror: () => setTileError(true), tileload: () => setTileError(false) }} />
+      <TileLayer
+        url="https://tile.openstreetmap.jp/styles/osm-bright-en/{z}/{x}/{y}.png"
+        attribution='<a href="https://openmaptiles.org/">&copy; OpenMapTiles</a> <a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>'
+        maxZoom={20}
+        eventHandlers={{ tileerror: () => setTileError(true), tileload: () => setTileError(false) }}
+      />
       <MapViewport stops={stops} selectedStop={selectedStop} />
       {stops.map((stop, index) => stop.coordinates && <Marker key={stop.id} position={stop.coordinates} title={`${index + 1}. ${stop.name}`} alt={`${index + 1}. ${stop.name}`} zIndexOffset={selectedStop?.id === stop.id ? 1000 : 0} icon={divIcon({
         className: `stop-marker ${selectedStop?.id === stop.id ? 'is-selected' : ''}`,

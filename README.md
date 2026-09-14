@@ -47,7 +47,8 @@ Tocar una actividad centra y resalta su marker. Tocar un marker selecciona y
 muestra su actividad. «Ver todo el día» vuelve a encuadrar todas las paradas.
 Al cambiar de día se reinicia la selección. El mapa muestra solo ese día.
 
-Los tiles usan OpenStreetMap y necesitan conexión. El MVP no tiene caché offline,
+Los tiles usan la capa raster Bright EN de OpenStreetMap Foundation Japan, con
+etiquetas en inglés, y necesitan conexión. El MVP no tiene caché offline,
 geolocalización ni cálculo de rutas. Las coordenadas están en orden `[latitud,
 longitud]`, la duración en minutos y los horarios en formato `HH:mm`.
 
