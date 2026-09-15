@@ -4,6 +4,7 @@ import TripPage from './pages/TripPage';
 import CityPage from './pages/CityPage';
 import DayPage from './pages/DayPage';
 import NotFound from './components/NotFound';
+import BackToTopButton from './components/BackToTopButton';
 
 export default function App() {
   const { pathname } = useLocation();
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </main>
+    <BackToTopButton />
     <footer className="page-shell site-footer">
       <span>Hecho para ir sin apuro.</span><span>日本 · 2026</span>
     </footer>
