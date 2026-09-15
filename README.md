@@ -46,10 +46,18 @@ ejecutarse manualmente desde la pestaña Actions del repositorio.
 - `src/components/`: selector de ciudad/día, mapa y lista de paradas.
 - `src/dates.ts`: operaciones pequeñas con fechas, independientes de la zona
   horaria del teléfono. Todos los horarios de actividades son de Japón.
+- `src/storage.ts`: preferencias locales para el último día abierto y las
+  actividades realizadas.
 
 Tocar una actividad centra y resalta su marker. Tocar un marker selecciona y
 muestra su actividad. «Ver todo el día» vuelve a encuadrar todas las paradas.
-Al cambiar de día se reinicia la selección. El mapa muestra solo ese día.
+Al cambiar de día se reinicia la selección. El mapa muestra solo ese día. Las
+paradas con coordenadas pueden abrirse en Google Maps mediante una URL universal,
+sin API ni credenciales.
+
+El último día abierto y las actividades realizadas se guardan en `localStorage`.
+Se conservan al cerrar el navegador y pueden restablecerse por día. Son datos del
+navegador y dispositivo actual: no se sincronizan entre teléfonos.
 
 Los tiles usan la capa raster Bright EN de OpenStreetMap Foundation Japan, con
 etiquetas en inglés, y necesitan conexión. El MVP no tiene caché offline,

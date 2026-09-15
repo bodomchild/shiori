@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { itinerary } from '../data/itinerary';
 import { cityDates, daySlug, formatDate, tripDayPath, tripDays } from '../dates';
@@ -7,9 +7,11 @@ import NotFound from '../components/NotFound';
 import DaySelector from '../components/DaySelector';
 import DayMap from '../components/DayMap';
 import StopList from '../components/StopList';
+import { loadCompletedStopIds, saveCompletedStopIds, saveLastOpenedDay } from '../storage';
 
 function DayView({ city, day }: { city: City; day: Day }) {
   const [selectedStop, setSelectedStop] = useState<ItineraryStop | null>(null);
+  const [completedStopIds, setCompletedStopIds] = useState(loadCompletedStopIds);
   const selectedStopId = selectedStop?.id ?? null;
   const stops = day.stops;
   const mappedStops = stops.filter((stop) => stop.coordinates);
@@ -17,6 +19,11 @@ function DayView({ city, day }: { city: City; day: Day }) {
   const dayIndex = allDays.findIndex((entry) => entry.city.id === city.id && entry.date === day.date);
   const previousDay = allDays[dayIndex - 1];
   const nextDay = allDays[dayIndex + 1];
+  const completedOnDay = stops.filter((stop) => completedStopIds.has(stop.id)).length;
+
+  useEffect(() => {
+    saveLastOpenedDay({ cityId: city.id, date: day.date });
+  }, [city.id, day.date]);
 
   function selectStop(id: string) {
     const stop = stops.find((entry) => entry.id === id);
@@ -29,6 +36,25 @@ function DayView({ city, day }: { city: City; day: Day }) {
     // Wait for the selected card's address and note to finish expanding.
     requestAnimationFrame(() => {
       document.getElementById(`stop-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    });
+  }
+
+  function toggleCompleted(id: string) {
+    setCompletedStopIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveCompletedStopIds(next);
+      return next;
+    });
+  }
+
+  function resetDayProgress() {
+    setCompletedStopIds((current) => {
+      const next = new Set(current);
+      stops.forEach((stop) => next.delete(stop.id));
+      saveCompletedStopIds(next);
+      return next;
     });
   }
 
@@ -48,8 +74,8 @@ function DayView({ city, day }: { city: City; day: Day }) {
           <div className="map-caption"><span className="red-dot" /><p aria-live="polite">{selectedStop ? selectedStop.coordinates ? selectedStop.name : `${selectedStop.name} · sin ubicación confirmada` : mappedStops.length ? `${mappedStops.length} ubicaciones · tocá una actividad para encontrarla` : 'El cronograma sigue disponible debajo'}</p></div>
         </section>
         <section className="itinerary-panel" aria-labelledby="stops-title">
-          <div className="list-heading"><h2 id="stops-title">El plan del día</h2><span className="small-muted">PASO A PASO</span></div>
-          <StopList stops={stops} selectedStopId={selectedStopId} onSelect={selectStop} />
+          <div className="list-heading"><h2 id="stops-title">El plan del día</h2><div className="list-heading-actions"><span className="small-muted">{completedOnDay ? `${completedOnDay} DE ${stops.length} REALIZADAS` : 'PASO A PASO'}</span>{completedOnDay > 0 && <button type="button" className="reset-progress" onClick={resetDayProgress}>Restablecer</button>}</div></div>
+          <StopList stops={stops} selectedStopId={selectedStopId} completedStopIds={completedStopIds} onSelect={selectStop} onToggleCompleted={toggleCompleted} />
           <p className="list-footnote">Los horarios son aproximados. Siempre hay lugar para cambiar de plan.</p>
         </section>
       </div>

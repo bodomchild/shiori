@@ -1,12 +1,17 @@
 import { Link } from 'react-router-dom';
 import { itinerary } from '../data/itinerary';
-import { cityDates, closestTripDay, daySlug, formatDate, tripDayPath } from '../dates';
+import { cityDates, closestTripDay, daySlug, formatDate, tripDayPath, tripDays } from '../dates';
+import { loadLastOpenedDay } from '../storage';
 
 const cityCharacters = ['大阪', '京都', '金沢', '河口湖', '箱根', '東京'];
 
 export default function TripPage() {
   const totalDays = itinerary.cities.reduce((total, city) => total + cityDates(city).length, 0);
   const current = closestTripDay(itinerary);
+  const storedDay = loadLastOpenedDay();
+  const lastOpenedDay = storedDay
+    ? tripDays(itinerary).find((entry) => entry.city.id === storedDay.cityId && entry.date === storedDay.date)
+    : undefined;
   const currentLabel = current.relation === 'today'
     ? 'Ver el plan de hoy'
     : current.relation === 'before'
@@ -21,6 +26,7 @@ export default function TripPage() {
         <div className="hero-meta"><span>13 oct — 4 nov</span><span>{totalDays} días</span><span>6 ciudades</span></div>
         <div className="hero-actions">
           <Link className="primary-link" to={tripDayPath(current.tripDay)}>{currentLabel} <span aria-hidden="true">→</span></Link>
+          {lastOpenedDay && tripDayPath(lastOpenedDay) !== tripDayPath(current.tripDay) && <Link className="secondary-link" to={tripDayPath(lastOpenedDay)}>Continuar {lastOpenedDay.city.name} · {formatDate(lastOpenedDay.date)}</Link>}
           <button className="secondary-link" type="button" onClick={() => {
             document.getElementById('todos-los-dias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }}>Ver todos los días</button>
