@@ -13,6 +13,7 @@ function DayView({ city, day }: { city: City; day: Day }) {
   const selectedStopId = selectedStop?.id ?? null;
   const stops = day.stops;
   const mappedStops = stops.filter((stop) => stop.coordinates);
+  const isTestDay = city.id === 'mendoza';
   const allDays = tripDays(itinerary);
   const dayIndex = allDays.findIndex((entry) => entry.city.id === city.id && entry.date === day.date);
   const previousDay = allDays[dayIndex - 1];
@@ -41,7 +42,7 @@ function DayView({ city, day }: { city: City; day: Day }) {
     </nav>
     <div className="day-heading"><div><p className="eyebrow">{city.name} · {formatDate(day.date, { weekday: 'long', day: 'numeric', month: 'long' })}</p><h1 className="page-title">{day.title}</h1>{day.notes && <p className="day-note">{day.notes}</p>}</div><DaySelector city={city} date={day.date} /></div>
     {stops.length > 0 ? <>
-      <div className="day-info"><span><span className="red-dot" /> {stops.length} actividades · Horarios de Japón</span><span className="source-badge">Itinerario real</span></div>
+      <div className="day-info"><span><span className="red-dot" /> {stops.length} actividades · {isTestDay ? 'Horarios de Mendoza' : 'Horarios de Japón'}</span><span className="source-badge">{isTestDay ? 'Datos de prueba' : 'Itinerario real'}</span></div>
       <div className="day-layout">
         <section className={`map-panel${mappedStops.length ? '' : ' map-panel-static'}`} aria-label={`Mapa del ${formatDate(day.date)} en ${city.name}`}>
           {mappedStops.length ? <DayMap stops={stops} selectedStop={selectedStop} onSelect={selectFromMap} /> : <div id="day-map" className="map-placeholder"><span aria-hidden="true">地図</span><strong>Ubicaciones por confirmar</strong><p>Este día ya tiene actividades, pero la fuente todavía no define lugares concretos para el mapa.</p></div>}

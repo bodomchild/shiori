@@ -36,27 +36,25 @@ export function tripDays(trip: Trip): TripDay[] {
   })));
 }
 
-export function japanToday(now = new Date()): string {
-  const parts = new Intl.DateTimeFormat('en', {
-    timeZone: 'Asia/Tokyo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value;
-  return `${value('year')}-${value('month')}-${value('day')}`;
+export function localToday(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function tripDayPath({ city, date }: TripDay) {
   return `/${city.id}/${daySlug(date)}`;
 }
 
-export function closestTripDay(trip: Trip, today = japanToday()): { tripDay: TripDay; relation: 'before' | 'today' | 'after' } {
+export function closestTripDay(trip: Trip, today = localToday()): { tripDay: TripDay; relation: 'before' | 'today' | 'upcoming' | 'after' } {
   const days = tripDays(trip);
   const first = days[0];
   const last = days.at(-1);
   if (!first || !last) throw new Error('El itinerario no tiene días');
   if (today < first.date) return { tripDay: first, relation: 'before' };
   if (today > last.date) return { tripDay: last, relation: 'after' };
-  return { tripDay: days.find((entry) => entry.date === today) ?? first, relation: 'today' };
+  const current = days.find((entry) => entry.date === today);
+  if (current) return { tripDay: current, relation: 'today' };
+  return { tripDay: days.find((entry) => entry.date > today) ?? last, relation: 'upcoming' };
 }

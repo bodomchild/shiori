@@ -7,6 +7,209 @@ export const itinerary: Trip = {
   "name": "Japón · Lore & Fer",
   "cities": [
     {
+      "id": "mendoza",
+      "name": "Mendoza",
+      "startDate": "2026-09-13",
+      "endDate": "2026-09-17",
+      "days": [
+        {
+          "date": "2026-09-13",
+          "title": "Centro de Mendoza",
+          "notes": "Día temporal de prueba para comprobar la navegación y el mapa antes del viaje.",
+          "stops": [
+            {
+              "id": "mendoza-09-13-01-plaza-independencia",
+              "name": "Plaza Independencia",
+              "coordinates": [-32.8895, -68.8458],
+              "startTime": "10:00",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Paseo tranquilo por la plaza y el centro.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-13-02-peatonal-sarmiento",
+              "name": "Peatonal Sarmiento",
+              "coordinates": [-32.889, -68.8416],
+              "startTime": "11:15",
+              "duration": 45,
+              "category": "visita",
+              "notes": "Caminar por la peatonal y parar a tomar un café.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-13-03-mercado-central",
+              "name": "Mercado Central",
+              "coordinates": [-32.8844, -68.843],
+              "startTime": "13:00",
+              "duration": 75,
+              "category": "comida",
+              "notes": "Almuerzo de prueba en el centro.",
+              "optional": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-14",
+          "title": "Parque General San Martín",
+          "notes": "Día temporal de prueba para verificar el acceso automático al plan de hoy.",
+          "stops": [
+            {
+              "id": "mendoza-09-14-01-portones-del-parque",
+              "name": "Portones del Parque General San Martín",
+              "coordinates": [-32.889, -68.8758],
+              "startTime": "09:30",
+              "duration": 30,
+              "category": "visita",
+              "notes": "Punto de inicio para recorrer el parque.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-14-02-lago-del-parque",
+              "name": "Lago del Parque",
+              "coordinates": [-32.886, -68.8915],
+              "startTime": "10:15",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Caminata alrededor del lago.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-14-03-cerro-de-la-gloria",
+              "name": "Cerro de la Gloria",
+              "coordinates": [-32.8875, -68.8994],
+              "startTime": "11:45",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Subir hasta el monumento y ver la ciudad desde arriba.",
+              "optional": true
+            },
+            {
+              "id": "mendoza-09-14-04-aristides",
+              "name": "Avenida Arístides Villanueva",
+              "coordinates": [-32.895, -68.8568],
+              "startTime": "20:00",
+              "duration": 90,
+              "category": "comida",
+              "notes": "Elegir dónde cenar en el momento.",
+              "optional": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-15",
+          "title": "Historia y plazas",
+          "notes": "Contenido de muestra; no forma parte del viaje a Japón.",
+          "stops": [
+            {
+              "id": "mendoza-09-15-01-area-fundacional",
+              "name": "Museo del Área Fundacional",
+              "coordinates": [-32.8748, -68.8355],
+              "startTime": "10:00",
+              "duration": 75,
+              "category": "visita",
+              "notes": "Recorrido de prueba por la zona histórica.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-15-02-alameda",
+              "name": "Paseo Alameda",
+              "coordinates": [-32.8793, -68.8396],
+              "startTime": "12:00",
+              "duration": 45,
+              "category": "visita",
+              "notes": "Caminata hacia el centro.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-15-03-plaza-espana",
+              "name": "Plaza España",
+              "coordinates": [-32.8912, -68.8476],
+              "startTime": "17:00",
+              "duration": 45,
+              "category": "visita",
+              "notes": "Parada breve para probar la selección desde el mapa.",
+              "optional": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-16",
+          "title": "Chacras de Coria",
+          "notes": "Plan sencillo de muestra fuera del centro de Mendoza.",
+          "stops": [
+            {
+              "id": "mendoza-09-16-01-traslado-chacras",
+              "name": "Traslado a Chacras de Coria",
+              "coordinates": [-32.986, -68.8865],
+              "startTime": "10:00",
+              "duration": 35,
+              "category": "traslado",
+              "notes": "Horario y medio de transporte solo ilustrativos.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-16-02-plaza-chacras",
+              "name": "Plaza de Chacras de Coria",
+              "coordinates": [-32.986, -68.8865],
+              "startTime": "10:45",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Paseo por la plaza y los alrededores.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-16-03-almuerzo-chacras",
+              "name": "Almuerzo en Chacras",
+              "coordinates": [-32.986, -68.8865],
+              "startTime": "13:00",
+              "duration": 90,
+              "category": "comida",
+              "notes": "Restaurante a elegir; actividad de muestra.",
+              "optional": false
+            }
+          ]
+        },
+        {
+          "date": "2026-09-17",
+          "title": "Parque Central y cierre de prueba",
+          "notes": "Último día del bloque temporal de Mendoza.",
+          "stops": [
+            {
+              "id": "mendoza-09-17-01-parque-central",
+              "name": "Parque Central",
+              "coordinates": [-32.8783, -68.8358],
+              "startTime": "10:00",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Caminata por el parque.",
+              "optional": false
+            },
+            {
+              "id": "mendoza-09-17-02-nave-cultural",
+              "name": "Nave Cultural",
+              "coordinates": [-32.8757, -68.8412],
+              "startTime": "11:30",
+              "duration": 60,
+              "category": "visita",
+              "notes": "Parada de prueba; comprobar la programación antes de una visita real.",
+              "optional": true
+            },
+            {
+              "id": "mendoza-09-17-03-cafe-centro",
+              "name": "Café en el centro",
+              "coordinates": [-32.8895, -68.8458],
+              "startTime": "17:00",
+              "duration": 60,
+              "category": "comida",
+              "notes": "Cierre del itinerario temporal de prueba.",
+              "optional": false
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "osaka",
       "name": "Osaka",
       "startDate": "2026-10-13",
