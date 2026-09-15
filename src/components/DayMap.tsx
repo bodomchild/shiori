@@ -7,9 +7,10 @@ interface Props {
   stops: ItineraryStop[];
   selectedStop: ItineraryStop | null;
   onSelect: (id: string) => void;
+  onClearSelection: () => void;
 }
 
-function MapViewport({ stops, selectedStop }: Omit<Props, 'onSelect'>) {
+function MapViewport({ stops, selectedStop, onClearSelection }: Omit<Props, 'onSelect'>) {
   const map = useMap();
   const mappedStops = useMemo(() => stops.filter((stop): stop is ItineraryStop & { coordinates: [number, number] } => Boolean(stop.coordinates)), [stops]);
   useEffect(() => {
@@ -26,10 +27,13 @@ function MapViewport({ stops, selectedStop }: Omit<Props, 'onSelect'>) {
     return () => observer.disconnect();
   }, [map]);
 
-  return <button type="button" className="map-reset" onClick={() => map.fitBounds(latLngBounds(mappedStops.map((stop) => stop.coordinates)), { padding: [38, 38], maxZoom: 15, animate: false })}>Ver todo el día</button>;
+  return <button type="button" className="map-reset" onClick={() => {
+    map.fitBounds(latLngBounds(mappedStops.map((stop) => stop.coordinates)), { padding: [38, 38], maxZoom: 15, animate: false });
+    onClearSelection();
+  }}>Ver todo el día</button>;
 }
 
-export default function DayMap({ stops, selectedStop, onSelect }: Props) {
+export default function DayMap({ stops, selectedStop, onSelect, onClearSelection }: Props) {
   const [tileError, setTileError] = useState(false);
   const firstMappedStop = stops.find((stop): stop is ItineraryStop & { coordinates: [number, number] } => Boolean(stop.coordinates))!;
   return <div id="day-map" className="map-wrapper">
@@ -40,7 +44,7 @@ export default function DayMap({ stops, selectedStop, onSelect }: Props) {
         maxZoom={20}
         eventHandlers={{ tileerror: () => setTileError(true), tileload: () => setTileError(false) }}
       />
-      <MapViewport stops={stops} selectedStop={selectedStop} />
+      <MapViewport stops={stops} selectedStop={selectedStop} onClearSelection={onClearSelection} />
       {stops.map((stop, index) => stop.coordinates && <Marker key={stop.id} position={stop.coordinates} title={`${index + 1}. ${stop.name}`} alt={`${index + 1}. ${stop.name}`} zIndexOffset={selectedStop?.id === stop.id ? 1000 : 0} icon={divIcon({
         className: `stop-marker ${selectedStop?.id === stop.id ? 'is-selected' : ''}`,
         html: `<span>${index + 1}</span>`,

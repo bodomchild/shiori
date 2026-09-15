@@ -70,7 +70,7 @@ function DayView({ city, day }: { city: City; day: Day }) {
       <div className="day-info"><span><span className="red-dot" /> {stops.length} actividades · Horarios de Japón</span><span className="source-badge">Itinerario real</span></div>
       <div className="day-layout">
         <section className={`map-panel${mappedStops.length ? '' : ' map-panel-static'}`} aria-label={`Mapa del ${formatDate(day.date)} en ${city.name}`}>
-          {mappedStops.length ? <DayMap stops={stops} selectedStop={selectedStop} onSelect={selectFromMap} /> : <div id="day-map" className="map-placeholder"><span aria-hidden="true">地図</span><strong>Ubicaciones por confirmar</strong><p>Este día ya tiene actividades, pero la fuente todavía no define lugares concretos para el mapa.</p></div>}
+          {mappedStops.length ? <DayMap stops={stops} selectedStop={selectedStop} onSelect={selectFromMap} onClearSelection={() => setSelectedStop(null)} /> : <div id="day-map" className="map-placeholder"><span aria-hidden="true">地図</span><strong>Ubicaciones por confirmar</strong><p>Este día ya tiene actividades, pero la fuente todavía no define lugares concretos para el mapa.</p></div>}
           <div className="map-caption"><span className="red-dot" /><p aria-live="polite">{selectedStop ? selectedStop.coordinates ? selectedStop.name : `${selectedStop.name} · sin ubicación confirmada` : mappedStops.length ? `${mappedStops.length} ubicaciones · tocá una actividad para encontrarla` : 'El cronograma sigue disponible debajo'}</p></div>
         </section>
         <section className="itinerary-panel" aria-labelledby="stops-title">
