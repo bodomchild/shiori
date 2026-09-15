@@ -35,6 +35,7 @@ export default function App() {
         <Route path="/:cityId" element={<CityPage />} />
         <Route path="/:cityId/:dayId" element={<DayPage />} />
         <Route path="/photos" element={<Suspense fallback={<div className="page-shell route-loading">Preparando la galería…</div>}><PhotosPage /></Suspense>} />
+        <Route path="/photos/:cityId" element={<Suspense fallback={<div className="page-shell route-loading">Preparando la galería…</div>}><PhotosPage /></Suspense>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </main>

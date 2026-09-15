@@ -2,9 +2,41 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Cerrado por defecto hasta registrar los UID de Lore y Fer.
-    match /{allPaths=**} {
-      allow read, write: if false;
+    function isAllowedUser() {
+      return request.auth != null
+        && request.auth.uid in ['8ew8WV6wdVWGDeyYet2LC4VIK3n2'];
+    }
+
+    function isValidCity(cityId) {
+      return cityId in ['osaka', 'kyoto', 'kanazawa', 'kawaguchiko', 'hakone', 'tokyo'];
+    }
+
+    function hasValidMetadata(cityId, photoId) {
+      return request.resource.metadata.tripId == 'japan-2026'
+        && request.resource.metadata.cityId == cityId
+        && request.resource.metadata.photoId == photoId
+        && request.resource.metadata.uploaderUid == request.auth.uid;
+    }
+
+    match /trips/japan-2026/photos/{cityId}/{allPaths=**} {
+      allow read: if isAllowedUser() && isValidCity(cityId);
+    }
+
+    match /trips/japan-2026/photos/{cityId}/{photoId}/{fileName} {
+      allow create: if isAllowedUser()
+        && isValidCity(cityId)
+        && resource == null
+        && hasValidMetadata(cityId, photoId)
+        && request.resource.contentType.matches('image/.*')
+        && (
+          (fileName == 'original' && request.resource.size <= 30 * 1024 * 1024)
+          || (fileName == 'preview.jpg'
+            && request.resource.contentType == 'image/jpeg'
+            && request.resource.size <= 2 * 1024 * 1024)
+        );
+
+      // La app no puede sobrescribir ni borrar recuerdos.
+      allow update, delete: if false;
     }
   }
 }

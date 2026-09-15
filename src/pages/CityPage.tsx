@@ -10,7 +10,7 @@ export default function CityPage() {
   const today = japanToday();
 
   return <div className="page-shell city-page">
-    <Link className="back-link" to="/">← Todo el viaje</Link>
+    <div className="page-top-links"><Link className="back-link" to="/">← Todo el viaje</Link><Link className="city-photos-link" to={`/photos/${city.id}`}>Fotos de {city.name}</Link></div>
     <p className="eyebrow">{formatDate(city.startDate)} — {formatDate(city.endDate)} · 2026</p>
     <h1 className="page-title">Unos días en {city.name}.</h1>
     <p className="page-description">Elegí un día y veamos adónde nos lleva.</p>

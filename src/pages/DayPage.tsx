@@ -59,7 +59,7 @@ function DayView({ city, day }: { city: City; day: Day }) {
   }
 
   return <div className="page-shell day-page">
-    <Link className="back-link" to={`/${city.id}`}>← Días en {city.name}</Link>
+    <div className="page-top-links"><Link className="back-link" to={`/${city.id}`}>← Días en {city.name}</Link><Link className="city-photos-link" to={`/photos/${city.id}`}>Fotos de {city.name}</Link></div>
     <nav className="day-navigation" aria-label="Navegación entre días del viaje">
       {previousDay ? <Link to={tripDayPath(previousDay)} rel="prev"><span aria-hidden="true">←</span><span><small>Anterior</small><strong>{formatDate(previousDay.date, { day: 'numeric', month: 'short' })}</strong></span></Link> : <span />}
       <span className="day-position">DÍA {dayIndex + 1} DE {allDays.length}</span>
