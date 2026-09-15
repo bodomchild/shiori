@@ -225,7 +225,18 @@ main:focus { outline: none; }
 .photo-viewer-content img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .photo-viewer-content > p { color: #e8e6dc; font-size: 12px; }
 .photo-viewer-close { position: fixed; z-index: 2; top: max(12px, env(safe-area-inset-top)); right: 13px; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #ffffff55; border-radius: 50%; background: #1117; color: #fff; font-size: 28px; line-height: 1; }
-.photo-viewer-content > a { position: fixed; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); min-height: 44px; display: inline-flex; align-items: center; padding: 9px 14px; border: 1px solid #ffffff66; border-radius: 22px; background: #1119; color: #fff; font-size: 11px; }
+.photo-viewer-close:disabled { opacity: .45; }
+.photo-viewer-actions { position: fixed; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%; display: flex; gap: 9px; transform: translateX(-50%); }
+.photo-viewer-actions > a, .photo-viewer-actions > button { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 9px 14px; border: 1px solid #ffffff66; border-radius: 22px; background: #1119; color: #fff; font-size: 11px; white-space: nowrap; }
+.photo-viewer-actions .photo-delete-button { border-color: #d88c82; color: #ffd8d2; }
+.photo-delete-confirm { position: fixed; z-index: 3; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; max-width: 470px; margin-inline: auto; padding: 16px; border: 1px solid #75504b; border-radius: 7px; background: #28231f; box-shadow: 0 12px 38px #0009; }
+.photo-delete-confirm > strong { display: block; font: 400 21px Georgia, serif; }
+.photo-delete-confirm > p { margin: 8px 0 14px; color: #e1ddd5; font-size: 11px; line-height: 1.5; }
+.photo-delete-confirm > div { display: flex; justify-content: flex-end; gap: 8px; }
+.photo-delete-confirm button { min-height: 44px; padding: 9px 14px; border: 1px solid #ffffff55; border-radius: 4px; background: transparent; color: #fff; font-size: 11px; }
+.photo-delete-confirm .photo-delete-confirm-button { border-color: #ad3d30; background: #ad3d30; }
+.photo-delete-confirm button:disabled { opacity: .55; }
+.photo-delete-confirm .photo-delete-error { margin-bottom: 12px; color: #ffb4aa; }
 .page-top-links { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .city-photos-link { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 20px; color: #a13b30; font-size: 12px; font-weight: 650; }
 .city-photos-link:hover { text-decoration: underline; }

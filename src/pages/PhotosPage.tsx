@@ -9,7 +9,7 @@ import PhotoViewer from '../components/PhotoViewer';
 import { itinerary } from '../data/itinerary';
 import { createPhotoPreview } from '../photos/createPreview';
 import { deletePendingPhoto, listPendingPhotos, savePendingPhoto } from '../photos/pendingUploads';
-import { listCityPhotos, uploadPendingPhoto } from '../photos/photoStorage';
+import { deleteCityPhoto, listCityPhotos, uploadPendingPhoto } from '../photos/photoStorage';
 import { MAX_ORIGINAL_BYTES, type PendingPhoto, type PhotoRecord, type UploadStatus } from '../photos/types';
 
 async function runTwoAtATime<T>(items: T[], worker: (item: T) => Promise<void>) {
@@ -204,7 +204,11 @@ function PhotosContent() {
       </div>}
     </>}
 
-    {selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />}
+    {selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} onDelete={async () => {
+      await deleteCityPhoto(selectedPhoto);
+      setPhotos((current) => current.filter((photo) => photo.photoId !== selectedPhoto.photoId));
+      setSelectedPhoto(null);
+    }} />}
   </div>;
 }
 

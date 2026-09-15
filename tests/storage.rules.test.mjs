@@ -76,10 +76,23 @@ test('rechaza vistas previas mayores a 2 MB', async () => {
   await assertFails(uploadBytes(ref(storage, 'trips/japan-2026/photos/osaka/photo-preview/preview.jpg'), oversized, metadata('osaka', 'photo-preview')));
 });
 
-test('la aplicación no puede sobrescribir ni borrar una foto', async () => {
+test('una cuenta autorizada puede borrar ambos archivos de una foto, pero no sobrescribirlos', async () => {
   const storage = testEnvironment.authenticatedContext(FER_UID).storage();
-  const object = ref(storage, 'trips/japan-2026/photos/osaka/photo-7/original');
-  await assertSucceeds(uploadBytes(object, new Uint8Array([1]), metadata('osaka', 'photo-7')));
-  await assertFails(uploadBytes(object, new Uint8Array([2]), metadata('osaka', 'photo-7')));
-  await assertFails(deleteObject(object));
+  const base = 'trips/japan-2026/photos/osaka/photo-7';
+  const original = ref(storage, `${base}/original`);
+  const preview = ref(storage, `${base}/preview.jpg`);
+  await assertSucceeds(uploadBytes(original, new Uint8Array([1]), metadata('osaka', 'photo-7')));
+  await assertSucceeds(uploadBytes(preview, new Uint8Array([2]), metadata('osaka', 'photo-7')));
+  await assertFails(uploadBytes(original, new Uint8Array([3]), metadata('osaka', 'photo-7')));
+  await assertSucceeds(deleteObject(original));
+  await assertSucceeds(deleteObject(preview));
+});
+
+test('una cuenta no autorizada no puede borrar fotos', async () => {
+  const ownerStorage = testEnvironment.authenticatedContext(FER_UID).storage();
+  const path = 'trips/japan-2026/photos/osaka/photo-8/original';
+  await assertSucceeds(uploadBytes(ref(ownerStorage, path), new Uint8Array([1]), metadata('osaka', 'photo-8')));
+
+  const otherStorage = testEnvironment.authenticatedContext(OTHER_UID).storage();
+  await assertFails(deleteObject(ref(otherStorage, path)));
 });

@@ -18,6 +18,12 @@ service firebase.storage {
         && request.resource.metadata.uploaderUid == request.auth.uid;
     }
 
+    function hasValidStoredMetadata(cityId, photoId) {
+      return resource.metadata.tripId == 'japan-2026'
+        && resource.metadata.cityId == cityId
+        && resource.metadata.photoId == photoId;
+    }
+
     match /trips/japan-2026/photos/{cityId}/{allPaths=**} {
       allow read: if isAllowedUser() && isValidCity(cityId);
     }
@@ -35,8 +41,13 @@ service firebase.storage {
             && request.resource.size <= 2 * 1024 * 1024)
         );
 
-      // La app no puede sobrescribir ni borrar recuerdos.
-      allow update, delete: if false;
+      allow delete: if isAllowedUser()
+        && isValidCity(cityId)
+        && fileName in ['original', 'preview.jpg']
+        && hasValidStoredMetadata(cityId, photoId);
+
+      // Los objetos siguen siendo inmutables: nunca se sobrescriben.
+      allow update: if false;
     }
   }
 }

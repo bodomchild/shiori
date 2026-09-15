@@ -1,5 +1,6 @@
 import { FirebaseError } from 'firebase/app';
 import {
+  deleteObject,
   getBlob,
   getMetadata,
   list,
@@ -107,4 +108,20 @@ export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
 
 export function loadPhotoBlob(path: string) {
   return getBlob(ref(photoStorage, path));
+}
+
+async function deleteObjectIfPresent(path: string) {
+  try {
+    await deleteObject(ref(photoStorage, path));
+  } catch (error) {
+    if (error instanceof FirebaseError && error.code === 'storage/object-not-found') return;
+    throw error;
+  }
+}
+
+export async function deleteCityPhoto(photo: PhotoRecord) {
+  // Mantener la vista previa hasta el final permite reintentar si falla el
+  // borrado del original. La galería usa la vista previa como registro visible.
+  await deleteObjectIfPresent(photo.originalPath);
+  await deleteObjectIfPresent(photo.previewPath);
 }

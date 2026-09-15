@@ -82,7 +82,10 @@ trips/japan-2026/photos/{cityId}/{photoId}/preview.jpg
 ```
 
 `storage.rules` limita el acceso a los UID declarados, valida ciudad, tipo,
-tamaño y metadatos, y no permite sobrescribir ni borrar desde la aplicación.
+tamaño y metadatos, no permite sobrescribir archivos y limita el borrado a las
+cuentas autorizadas. Al borrar una foto, la aplicación elimina su original y su
+vista previa; la política de Soft Delete del bucket permite recuperarlos durante
+30 días.
 Después de agregar o modificar los UID, probar y publicar las reglas con:
 
 ```sh
