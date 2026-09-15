@@ -1,13 +1,13 @@
 import { Link, useParams } from 'react-router-dom';
 import { itinerary } from '../data/itinerary';
-import { cityDates, daySlug, formatDate, localToday } from '../dates';
+import { cityDates, daySlug, formatDate, japanToday } from '../dates';
 import NotFound from '../components/NotFound';
 
 export default function CityPage() {
   const { cityId } = useParams();
   const city = itinerary.cities.find((entry) => entry.id === cityId);
   if (!city) return <NotFound />;
-  const today = localToday();
+  const today = japanToday();
 
   return <div className="page-shell city-page">
     <Link className="back-link" to="/">← Todo el viaje</Link>
