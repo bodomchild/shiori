@@ -162,17 +162,18 @@ function PhotosContent() {
     <h1 className="page-title">{city ? `Fotos de ${city.name}.` : 'Fotos por ciudad.'}</h1>
     <p className="page-description">{city ? 'Originales protegidos en la nube y una vista previa liviana para recorrerlos.' : 'Las fotos se guardan en la nube privada de Lore y Fer, agrupadas solamente por ciudad.'}</p>
 
-    <section className="auth-card" aria-live="polite">
-      {loading ? <p>Comprobando la sesión…</p> : user ? <>
-        <span className="auth-ready" aria-hidden="true">✓</span>
-        <div><h2>Acceso listo</h2><p>Ingresaste como <strong>{user.displayName ?? user.email}</strong>.</p><p className="uid-copy">UID: <code>{user.uid}</code></p></div>
-      </> : <>
+    {loading ? <div className="auth-compact" aria-live="polite"><span className="auth-status">Comprobando sesión…</span></div> : user ?
+      <div className="auth-compact" aria-label="Cuenta conectada">
+        <span>{user.displayName ?? user.email}</span>
+        <AuthButton />
+      </div> : <section className="auth-card" aria-live="polite">
+      <>
         <span className="auth-symbol" aria-hidden="true">写</span>
         <div><h2>Ingresá para guardar fotos</h2><p>El itinerario es público. Solamente la galería necesita una cuenta autorizada.</p></div>
-      </>}
+      </>
       <AuthButton />
       {authError && <p className="auth-error" role="alert">{authError}</p>}
-    </section>
+    </section>}
 
     {!city && <div className="photo-city-grid" aria-label="Galerías por ciudad">
       {itinerary.cities.map((entry) => <Link to={`/photos/${entry.id}`} key={entry.id}>
