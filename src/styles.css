@@ -23,6 +23,9 @@ main:focus { outline: none; }
 .brand-mark { display: grid; place-items: center; width: 34px; height: 40px; background: #ad3d30; color: #fff6e7; font-size: 21px; clip-path: polygon(0 0,100% 0,100% 100%,50% 84%,0 100%); padding-bottom: 5px; }
 .brand-caption { display: block; font-family: var(--font-sans); font-size: 8px; letter-spacing: 1.8px; margin-top: 6px; }
 .travelers { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.photos-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding-inline: 12px; border: 1px solid #c7cdbd; border-radius: 22px; color: #4d5f42; font-size: 12px; font-weight: 650; }
+.photos-link:hover { background: #e8ecdf; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #6f7e61; }
 .red-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ad3d30; flex-shrink: 0; }
 .eyebrow { display: flex; align-items: center; gap: 9px; font-size: 10px; font-weight: 650; letter-spacing: 1.8px; text-transform: uppercase; color: #6a6e63; margin: 0 0 14px; }
@@ -168,6 +171,27 @@ main:focus { outline: none; }
 .secondary-link { background: transparent; color: #4b5d3e; border-color: #bbc5ae; }
 .primary-link:hover { background: #943429; }
 .secondary-link:hover { background: #e8ecdf; }
+.photos-page { padding-top: 16px; }
+.route-loading { min-height: 45vh; display: grid; place-items: center; color: #616b5a; font-size: 13px; }
+.auth-card { display: flex; align-items: center; flex-wrap: wrap; gap: 15px; margin-block: 28px 24px; padding: 20px; border: 1px solid #d4d8ca; border-radius: 6px; background: #fcfbf7; }
+.auth-card > div { flex: 1; min-width: 210px; }
+.auth-card h2 { margin: 0 0 6px; font: 400 24px Georgia, serif; }
+.auth-card p { margin: 0; color: #626b5c; font-size: 12px; line-height: 1.6; }
+.auth-symbol, .auth-ready { display: grid; place-items: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 50%; background: #e9ece2; color: #596c4e; font: 400 20px Georgia, serif; }
+.auth-ready { color: #fff; background: #607653; font-family: var(--font-sans); }
+.auth-button { min-height: 44px; padding: 10px 14px; border: 1px solid #ad3d30; border-radius: 4px; background: #ad3d30; color: #fffaf0; font-size: 12px; font-weight: 650; }
+.auth-button:hover { background: #943429; }
+.auth-status { color: #666e60; font-size: 11px; }
+.auth-card .auth-error { flex-basis: 100%; color: #97372d; }
+.auth-card .uid-copy { margin-top: 9px; }
+.uid-copy code { overflow-wrap: anywhere; color: #3e4d37; font-size: 11px; }
+.photo-city-grid { display: grid; gap: 12px; margin-bottom: 58px; }
+.photo-city-grid article { min-height: 132px; padding: 19px; border: 1px solid #dddfd3; border-radius: 6px; background: #eeeee5; }
+.photo-city-grid article:nth-child(3n+2) { background: #f1ebe3; border-color: #e6ddd0; }
+.photo-city-grid article:nth-child(3n) { background: #e9eeea; border-color: #d7dfd8; }
+.photo-city-grid span { color: #737a6d; font-size: 9px; letter-spacing: 1.2px; text-transform: uppercase; }
+.photo-city-grid h2 { margin: 28px 0 5px; font: 400 26px Georgia, serif; }
+.photo-city-grid p { margin: 0; color: #676e61; font-size: 11px; }
 .skip-link { position: fixed; top: -100px; left: 20px; z-index: 9999; padding: 12px 18px; background: #fff; color: #ad3d30; }
 .skip-link:focus { top: 10px; }
 
@@ -177,6 +201,7 @@ main:focus { outline: none; }
   .hero-copy h1 { font-size: 58px; }
   .days-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .trip-day-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .photo-city-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 380px) {
@@ -184,6 +209,7 @@ main:focus { outline: none; }
   .brand { font-size: 27px; }
   .brand-caption { letter-spacing: 1.3px; }
   .travelers { font-size: 11px; }
+  .travelers { display: none; }
   .day-navigation { grid-template-columns: minmax(70px, 1fr) auto minmax(70px, 1fr); gap: 5px; }
   .day-position { font-size: 8px; }
   .stop-actions { padding-left: 12px; }
@@ -226,6 +252,7 @@ main:focus { outline: none; }
   .day-info .source-badge { margin-right: 1px; }
   .city-page, .day-page { padding-top: 24px; }
   .days-grid { margin-top: 40px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .photo-city-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .day-card { padding: 22px 17px; gap: 14px; }
   .day-card .circle-arrow { width: 28px; height: 28px; }
 }

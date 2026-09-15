@@ -1,8 +1,9 @@
 # Shiori · Japón, Lore & Fer
 
 Una web estática para consultar el viaje del 13 de octubre al 4 de noviembre.
-React + TypeScript + Vite, React Router, Tailwind CSS y Leaflet. Sin backend,
-cuentas ni base de datos.
+React + TypeScript + Vite, React Router, Tailwind CSS, Leaflet y Firebase. No
+hay backend propio ni base de datos. Firebase Authentication y Cloud Storage se
+usan exclusivamente para la galería privada del viaje.
 
 Versión publicada: <https://bodomchild.github.io/shiori/>
 
@@ -48,6 +49,10 @@ ejecutarse manualmente desde la pestaña Actions del repositorio.
   horaria del teléfono. Todos los horarios de actividades son de Japón.
 - `src/storage.ts`: preferencias locales para el último día abierto y las
   actividades realizadas.
+- `src/firebase.ts`: configuración pública de la aplicación web de Firebase.
+- `src/auth/`: sesión de Google utilizada para proteger las fotos.
+- `storage.rules`: reglas de Cloud Storage, cerradas por defecto hasta registrar
+  las dos cuentas autorizadas.
 
 Tocar una actividad centra y resalta su marker. Tocar un marker selecciona y
 muestra su actividad. «Ver todo el día» vuelve a encuadrar todas las paradas.
@@ -58,6 +63,19 @@ sin API ni credenciales.
 El último día abierto y las actividades realizadas se guardan en `localStorage`.
 Se conservan al cerrar el navegador y pueden restablecerse por día. Son datos del
 navegador y dispositivo actual: no se sincronizan entre teléfonos.
+
+La ruta `/#/photos` permite que Lore y Fer ingresen con Google y muestra el UID
+de la cuenta. Durante la primera etapa, Cloud Storage permanece bloqueado. Una
+vez registrados ambos UID se habilitarán las reglas definitivas y la carga de
+fotos agrupadas por `cityId`; las fotos no se vinculan a actividades.
+
+`@firebase/rules-unit-testing` es solamente una dependencia de desarrollo y no
+se incluye en el JavaScript que recibe el navegador. Para evitar instalar cientos
+de paquetes permanentes, la CLI se ejecutará puntualmente con la versión fijada:
+
+```sh
+npx firebase-tools@15.30.1 deploy --only storage
+```
 
 Los tiles usan la capa raster Bright EN de OpenStreetMap Foundation Japan, con
 etiquetas en inglés, y necesitan conexión. El MVP no tiene caché offline,

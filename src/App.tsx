@@ -1,10 +1,12 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import TripPage from './pages/TripPage';
 import CityPage from './pages/CityPage';
 import DayPage from './pages/DayPage';
 import NotFound from './components/NotFound';
 import BackToTopButton from './components/BackToTopButton';
+
+const PhotosPage = lazy(() => import('./pages/PhotosPage'));
 
 export default function App() {
   const { pathname } = useLocation();
@@ -21,7 +23,10 @@ export default function App() {
           <span className="brand-mark" aria-hidden="true">栞</span>
           <span>shiori<span className="brand-caption">NUESTRO VIAJE A JAPÓN</span></span>
         </Link>
-        <span className="travelers"><span className="status-dot" /> Lore & Fer</span>
+        <div className="header-actions">
+          <span className="travelers"><span className="status-dot" /> Lore & Fer</span>
+          <Link className="photos-link" to="/photos">Fotos</Link>
+        </div>
       </div>
     </header>
     <main id="main-content" tabIndex={-1}>
@@ -29,6 +34,7 @@ export default function App() {
         <Route path="/" element={<TripPage />} />
         <Route path="/:cityId" element={<CityPage />} />
         <Route path="/:cityId/:dayId" element={<DayPage />} />
+        <Route path="/photos" element={<Suspense fallback={<div className="page-shell route-loading">Preparando la galería…</div>}><PhotosPage /></Suspense>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </main>

@@ -10,5 +10,9 @@ Thumbs.db
 .idea/
 .vscode/
 *.tsbuildinfo
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
 # Local reference documents are read-only and should not be published.
 references/

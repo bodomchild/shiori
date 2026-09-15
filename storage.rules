@@ -1,0 +1,10 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Cerrado por defecto hasta registrar los UID de Lore y Fer.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
