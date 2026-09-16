@@ -72,7 +72,7 @@ export async function uploadPendingPhoto(photo: PendingPhoto, uploaderUid: strin
   onProgress(1);
 }
 
-export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
+async function listCityPhotoFolders(cityId: string) {
   const prefixes = new Map<string, string>();
   let pageToken: string | undefined;
 
@@ -81,6 +81,16 @@ export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
     page.prefixes.forEach((prefix) => prefixes.set(prefix.name, prefix.fullPath));
     pageToken = page.nextPageToken;
   } while (pageToken);
+
+  return prefixes;
+}
+
+export async function countCityPhotos(cityId: string) {
+  return (await listCityPhotoFolders(cityId)).size;
+}
+
+export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
+  const prefixes = await listCityPhotoFolders(cityId);
 
   const records = await Promise.all([...prefixes].map(async ([photoId, fullPath]) => {
     try {

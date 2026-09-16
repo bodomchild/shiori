@@ -9,7 +9,7 @@ import PhotoViewer from '../components/PhotoViewer';
 import { itinerary } from '../data/itinerary';
 import { createPhotoPreview } from '../photos/createPreview';
 import { deletePendingPhoto, listPendingPhotos, savePendingPhoto } from '../photos/pendingUploads';
-import { deleteCityPhoto, listCityPhotos, uploadPendingPhoto } from '../photos/photoStorage';
+import { countCityPhotos, deleteCityPhoto, listCityPhotos, uploadPendingPhoto } from '../photos/photoStorage';
 import { MAX_ORIGINAL_BYTES, type PendingPhoto, type PhotoRecord, type UploadStatus } from '../photos/types';
 
 async function runTwoAtATime<T>(items: T[], worker: (item: T) => Promise<void>) {
@@ -39,9 +39,27 @@ function PhotosContent() {
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
+  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
+  const [loadingPhotoCounts, setLoadingPhotoCounts] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const inFlight = useRef(new Set<string>());
+  const statusTimers = useRef(new Map<string, number>());
+
+  const scheduleStatusRemoval = useCallback((id: string) => {
+    const previousTimer = statusTimers.current.get(id);
+    if (previousTimer) window.clearTimeout(previousTimer);
+    const timer = window.setTimeout(() => {
+      setStatuses((current) => {
+        if (current[id]?.state !== 'saved') return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      statusTimers.current.delete(id);
+    }, 5000);
+    statusTimers.current.set(id, timer);
+  }, []);
 
   const refreshGallery = useCallback(async () => {
     if (!user || !city) return;
@@ -92,12 +110,13 @@ function PhotosContent() {
       await deletePendingPhoto(prepared.id);
       updateStatus({ state: 'saved', progress: 1, message: 'Guardada en la nube.' });
       if (prepared.cityId === city?.id) await refreshGallery();
+      scheduleStatusRemoval(pending.id);
     } catch (error) {
       updateStatus({ state: 'queued', message: uploadErrorMessage(error) });
     } finally {
       inFlight.current.delete(pending.id);
     }
-  }, [city?.id, refreshGallery, user]);
+  }, [city?.id, refreshGallery, scheduleStatusRemoval, user]);
 
   const resumePending = useCallback(async () => {
     if (!user) return;
@@ -109,6 +128,36 @@ function PhotosContent() {
   }, [processPending, user]);
 
   useEffect(() => { void refreshGallery(); }, [refreshGallery]);
+
+  useEffect(() => {
+    if (!user || city) {
+      setPhotoCounts({});
+      setLoadingPhotoCounts(false);
+      return;
+    }
+
+    let active = true;
+    setLoadingPhotoCounts(true);
+    void Promise.allSettled(itinerary.cities.map(async (entry) => ({
+      cityId: entry.id,
+      count: await countCityPhotos(entry.id),
+    }))).then((results) => {
+      if (!active) return;
+      const counts: Record<string, number> = {};
+      results.forEach((result) => {
+        if (result.status === 'fulfilled') counts[result.value.cityId] = result.value.count;
+      });
+      setPhotoCounts(counts);
+    }).finally(() => {
+      if (active) setLoadingPhotoCounts(false);
+    });
+
+    return () => { active = false; };
+  }, [city, user]);
+
+  useEffect(() => () => {
+    statusTimers.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
 
   useEffect(() => {
     void resumePending();
@@ -176,9 +225,15 @@ function PhotosContent() {
     </section>}
 
     {!city && <div className="photo-city-grid" aria-label="Galerías por ciudad">
-      {itinerary.cities.map((entry) => <Link to={`/photos/${entry.id}`} key={entry.id}>
-        <span>Galería</span><h2>{entry.name}</h2><p>Abrir fotos <b aria-hidden="true">→</b></p>
-      </Link>)}
+      {itinerary.cities.map((entry) => {
+        const count = photoCounts[entry.id];
+        const summary = !user ? 'Abrir fotos' : count !== undefined
+          ? `${count} ${count === 1 ? 'foto' : 'fotos'}`
+          : loadingPhotoCounts ? 'Contando fotos…' : 'Cantidad no disponible';
+        return <Link to={`/photos/${entry.id}`} key={entry.id}>
+          <span>Galería</span><h2>{entry.name}</h2><p>{summary} <b aria-hidden="true">→</b></p>
+        </Link>;
+      })}
     </div>}
 
     {city && user && <>
