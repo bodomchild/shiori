@@ -10,6 +10,7 @@ export interface PendingPhoto {
   originalName: string;
   contentType: string;
   createdAt: string;
+  capturedAt?: string;
 }
 
 export interface PhotoRecord {
@@ -19,6 +20,7 @@ export interface PhotoRecord {
   previewPath: string;
   originalName: string;
   createdAt: string;
+  capturedAt?: string;
   uploaderUid: string;
 }
 

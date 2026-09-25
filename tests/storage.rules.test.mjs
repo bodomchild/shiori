@@ -8,6 +8,7 @@ import {
 import { deleteObject, getMetadata, list, ref, uploadBytes } from 'firebase/storage';
 
 const FER_UID = '8ew8WV6wdVWGDeyYet2LC4VIK3n2';
+const LORE_UID = 'HnuScK26yENhDdMC37HEfzYLzsE3';
 const OTHER_UID = 'another-user';
 const projectId = 'demo-shiori-storage-rules';
 let testEnvironment;
@@ -43,6 +44,15 @@ test('Fer puede crear, leer y listar originales y vistas previas válidas', asyn
   await assertSucceeds(uploadBytes(ref(storage, `${base}/preview.jpg`), new Uint8Array([3]), metadata('osaka', 'photo-1')));
   await assertSucceeds(getMetadata(ref(storage, `${base}/original`)));
   await assertSucceeds(list(ref(storage, 'trips/japan-2026/photos/osaka')));
+});
+
+test('Lore puede crear, leer y listar fotos con sus propios metadatos', async () => {
+  const storage = testEnvironment.authenticatedContext(LORE_UID).storage();
+  const base = 'trips/japan-2026/photos/kyoto/photo-lore';
+  await assertSucceeds(uploadBytes(ref(storage, `${base}/original`), new Uint8Array([1, 2]), metadata('kyoto', 'photo-lore', LORE_UID)));
+  await assertSucceeds(uploadBytes(ref(storage, `${base}/preview.jpg`), new Uint8Array([3]), metadata('kyoto', 'photo-lore', LORE_UID)));
+  await assertSucceeds(getMetadata(ref(storage, `${base}/original`)));
+  await assertSucceeds(list(ref(storage, 'trips/japan-2026/photos/kyoto')));
 });
 
 test('una cuenta no autorizada no puede leer ni crear fotos', async () => {

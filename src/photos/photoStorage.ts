@@ -50,6 +50,7 @@ export async function uploadPendingPhoto(photo: PendingPhoto, uploaderUid: strin
     uploaderUid,
     originalName: photo.originalName,
     createdAt: photo.createdAt,
+    ...(photo.capturedAt ? { capturedAt: photo.capturedAt } : {}),
   };
 
   if (!await objectExists(originalPath)) {
@@ -103,6 +104,7 @@ export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
         previewPath,
         originalName: metadata.customMetadata?.originalName ?? 'foto',
         createdAt: metadata.customMetadata?.createdAt ?? metadata.timeCreated,
+        ...(metadata.customMetadata?.capturedAt ? { capturedAt: metadata.customMetadata.capturedAt } : {}),
         uploaderUid: metadata.customMetadata?.uploaderUid ?? '',
       } satisfies PhotoRecord;
     } catch (error) {
@@ -113,7 +115,10 @@ export async function listCityPhotos(cityId: string): Promise<PhotoRecord[]> {
 
   return records
     .filter((record): record is PhotoRecord => record !== null)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .sort((left, right) => {
+      const byCaptureDate = (right.capturedAt ?? right.createdAt).localeCompare(left.capturedAt ?? left.createdAt);
+      return byCaptureDate || right.createdAt.localeCompare(left.createdAt) || right.photoId.localeCompare(left.photoId);
+    });
 }
 
 export function loadPhotoBlob(path: string) {

@@ -4,7 +4,10 @@ service firebase.storage {
   match /b/{bucket}/o {
     function isAllowedUser() {
       return request.auth != null
-        && request.auth.uid in ['8ew8WV6wdVWGDeyYet2LC4VIK3n2'];
+        && request.auth.uid in [
+          '8ew8WV6wdVWGDeyYet2LC4VIK3n2',
+          'HnuScK26yENhDdMC37HEfzYLzsE3'
+        ];
     }
 
     function isValidCity(cityId) {

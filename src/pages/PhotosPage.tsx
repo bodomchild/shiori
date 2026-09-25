@@ -8,6 +8,7 @@ import PhotoThumbnail from '../components/PhotoThumbnail';
 import PhotoViewer from '../components/PhotoViewer';
 import { itinerary } from '../data/itinerary';
 import { createPhotoPreview } from '../photos/createPreview';
+import { getPhotoCapturedAt } from '../photos/captureDate';
 import { deletePendingPhoto, listPendingPhotos, savePendingPhoto } from '../photos/pendingUploads';
 import { countCityPhotos, deleteCityPhoto, listCityPhotos, uploadPendingPhoto } from '../photos/photoStorage';
 import { MAX_ORIGINAL_BYTES, type PendingPhoto, type PhotoRecord, type UploadStatus } from '../photos/types';
@@ -182,6 +183,7 @@ function PhotosContent() {
         setStatuses((current) => ({ ...current, [id]: { id, cityId: city.id, fileName: file.name, state: 'error', progress: 0, message: 'La foto supera el máximo de 30 MB.' } }));
         continue;
       }
+      const createdAt = new Date().toISOString();
       const pending: PendingPhoto = {
         id,
         photoId: id,
@@ -189,7 +191,8 @@ function PhotosContent() {
         original: file,
         originalName: file.name || `foto-${id}`,
         contentType: file.type,
-        createdAt: new Date().toISOString(),
+        createdAt,
+        capturedAt: await getPhotoCapturedAt(file, createdAt),
       };
       try {
         await savePendingPhoto(pending);

@@ -81,6 +81,10 @@ trips/japan-2026/photos/{cityId}/{photoId}/original
 trips/japan-2026/photos/{cityId}/{photoId}/preview.jpg
 ```
 
+Las fotos nuevas se ordenan desde la captura más reciente. La app lee la fecha
+EXIF cuando está disponible y usa la fecha del archivo o de subida como respaldo;
+las fotos anteriores continúan funcionando con su fecha de subida.
+
 `storage.rules` limita el acceso a los UID declarados, valida ciudad, tipo,
 tamaño y metadatos, no permite sobrescribir archivos y limita el borrado a las
 cuentas autorizadas. Al borrar una foto, la aplicación elimina su original y su
