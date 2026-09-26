@@ -5,7 +5,7 @@ import { photoDatabase, photoFunctions } from '../firebase';
 export interface CityExportJob {
   id: string;
   status: 'queued' | 'processing' | 'ready' | 'error' | 'expired';
-  cityId: string;
+  scope: string;
   photoCount: number;
   partCount: number;
   completedParts: number;
@@ -18,11 +18,11 @@ export interface CityExportLink {
   url: string;
 }
 
-const startExportCallable = httpsCallable<{ cityId: string }, { jobId: string; partCount: number }>(photoFunctions, 'startCityExport');
+const startExportCallable = httpsCallable<{ scope: string }, { jobId: string; partCount: number }>(photoFunctions, 'startCityExport');
 const getLinksCallable = httpsCallable<{ jobId: string }, { links: CityExportLink[]; expiresAt: string }>(photoFunctions, 'getCityExportLinks');
 
-export async function startCityExport(cityId: string) {
-  return (await startExportCallable({ cityId })).data;
+export async function startCityExport(scope: string) {
+  return (await startExportCallable({ scope })).data;
 }
 
 export async function getCityExportLinks(jobId: string) {
@@ -40,7 +40,7 @@ export function subscribeToCityExport(jobId: string, onChange: (job: CityExportJ
     onChange({
       id: snapshot.id,
       status: data.status === 'ready' && expired ? 'expired' : data.status,
-      cityId: data.cityId,
+      scope: String(data.scope || data.cityId || ''),
       photoCount: Number(data.photoCount || 0),
       partCount: Number(data.partCount || 0),
       completedParts: Number(data.completedParts || 0),

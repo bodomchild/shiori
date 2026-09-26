@@ -19,7 +19,6 @@ import { listCityPhotos } from './photoStorage';
 import type { PhotoPageCursor, PhotoRecord } from './types';
 
 const TRIP_ID = 'japan-2026';
-const PAGE_SIZE = 50;
 const MIGRATION_ID = 'storage-photo-index-v1';
 
 function cityPhotos(cityId: string) {
@@ -70,18 +69,18 @@ export async function deletePhotoIndex(photo: PhotoRecord) {
   await deleteDoc(photoDocument(photo.cityId, photo.photoId));
 }
 
-export async function listCityPhotoPage(cityId: string, cursor?: PhotoPageCursor) {
+export async function listCityPhotoPage(cityId: string, pageSize: number, cursor?: PhotoPageCursor) {
   const constraints = [
     orderBy('sortAt', 'desc'),
     orderBy(documentId(), 'desc'),
     ...(cursor ? [startAfter(cursor.sortAt, cursor.photoId)] : []),
-    limit(PAGE_SIZE + 1),
+    limit(pageSize + 1),
   ];
   const snapshot = await getDocs(query(cityPhotos(cityId), ...constraints));
-  const pageDocuments = snapshot.docs.slice(0, PAGE_SIZE);
+  const pageDocuments = snapshot.docs.slice(0, pageSize);
   const photos = pageDocuments.map((entry) => photoFromData(entry.data()));
   const last = pageDocuments.at(-1);
-  const nextCursor = snapshot.size > PAGE_SIZE && last
+  const nextCursor = snapshot.size > pageSize && last
     ? { sortAt: String(last.get('sortAt')), photoId: last.id }
     : null;
   return { photos, nextCursor };

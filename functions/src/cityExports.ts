@@ -11,16 +11,25 @@ const ALLOWED_UIDS = new Set([
   '8ew8WV6wdVWGDeyYet2LC4VIK3n2',
   'HnuScK26yENhDdMC37HEfzYLzsE3',
 ]);
-const CITY_IDS = new Set(['osaka', 'kyoto', 'kanazawa', 'kawaguchiko', 'hakone', 'tokyo']);
-const TARGET_PART_BYTES = 1.5 * 1024 * 1024 * 1024;
+const CITY_ID_ORDER = ['osaka', 'kyoto', 'kanazawa', 'kawaguchiko', 'hakone', 'tokyo'] as const;
+const CITY_IDS = new Set<string>(CITY_ID_ORDER);
+const TARGET_PART_BYTES = 4 * 1024 * 1024 * 1024;
 const UNKNOWN_PHOTO_BYTES = 20 * 1024 * 1024;
-const MAX_PHOTOS_PER_PART = 150;
+const MAX_PHOTOS_PER_PART = 500;
 const EXPORT_LIFETIME_MS = 48 * 60 * 60 * 1000;
 
 interface ExportPhoto {
+  cityId: string;
   originalPath: string;
   originalName: string;
   estimatedSize: number;
+}
+
+interface ExportPart {
+  cityId: string;
+  cityPartIndex: number;
+  cityPartCount: number;
+  photos: ExportPhoto[];
 }
 
 interface ExportTaskData {
@@ -33,8 +42,8 @@ function requireAllowedUser(uid: string | undefined) {
   return uid;
 }
 
-function splitIntoParts(photos: ExportPhoto[]) {
-  const parts: ExportPhoto[][] = [];
+export function splitIntoParts(cityId: string, photos: ExportPhoto[]): ExportPart[] {
+  const photoParts: ExportPhoto[][] = [];
   let current: ExportPhoto[] = [];
   let currentBytes = 0;
 
@@ -42,15 +51,20 @@ function splitIntoParts(photos: ExportPhoto[]) {
     const wouldOverflow = current.length > 0
       && (currentBytes + photo.estimatedSize > TARGET_PART_BYTES || current.length >= MAX_PHOTOS_PER_PART);
     if (wouldOverflow) {
-      parts.push(current);
+      photoParts.push(current);
       current = [];
       currentBytes = 0;
     }
     current.push(photo);
     currentBytes += photo.estimatedSize;
   }
-  if (current.length) parts.push(current);
-  return parts;
+  if (current.length) photoParts.push(current);
+  return photoParts.map((part, index) => ({
+    cityId,
+    cityPartIndex: index + 1,
+    cityPartCount: photoParts.length,
+    photos: part,
+  }));
 }
 
 function safeFileName(name: string, index: number) {
@@ -58,32 +72,42 @@ function safeFileName(name: string, index: number) {
   return `${String(index + 1).padStart(4, '0')}-${cleaned}`;
 }
 
+export function cityExportFileName(cityId: string, partIndex: number, partCount: number) {
+  return partCount === 1 ? `fotos-${cityId}.zip` : `fotos-${cityId}-${partIndex}.zip`;
+}
+
 export const startCityExport = onCall({ region: REGION, timeoutSeconds: 120 }, async (request) => {
   const uid = requireAllowedUser(request.auth?.uid);
-  const cityId = typeof request.data?.cityId === 'string' ? request.data.cityId : '';
-  if (!CITY_IDS.has(cityId)) throw new HttpsError('invalid-argument', 'La ciudad no es válida.');
+  const scope = typeof request.data?.scope === 'string'
+    ? request.data.scope
+    : typeof request.data?.cityId === 'string' ? request.data.cityId : '';
+  if (scope !== 'all' && !CITY_IDS.has(scope)) throw new HttpsError('invalid-argument', 'La selección no es válida.');
 
   const database = getFirestore();
-  const photosSnapshot = await database.collection(`trips/japan-2026/cities/${cityId}/photos`)
-    .orderBy('sortAt', 'asc')
-    .get();
-  if (photosSnapshot.empty) throw new HttpsError('failed-precondition', 'La ciudad todavía no tiene fotos.');
-
-  const photos = photosSnapshot.docs.map((entry) => {
-    const data = entry.data();
-    const originalSize = Number(data.originalSize || 0);
-    return {
-      originalPath: String(data.originalPath),
-      originalName: String(data.originalName || 'foto.jpg'),
-      estimatedSize: originalSize > 0 ? originalSize : UNKNOWN_PHOTO_BYTES,
-    } satisfies ExportPhoto;
-  });
-  const parts = splitIntoParts(photos);
+  const selectedCityIds = scope === 'all' ? [...CITY_ID_ORDER] : [scope];
+  const photosByCity = await Promise.all(selectedCityIds.map(async (cityId) => {
+    const snapshot = await database.collection(`trips/japan-2026/cities/${cityId}/photos`)
+      .orderBy('sortAt', 'asc')
+      .get();
+    return snapshot.docs.map((entry) => {
+      const data = entry.data();
+      const originalSize = Number(data.originalSize || 0);
+      return {
+        cityId,
+        originalPath: String(data.originalPath),
+        originalName: String(data.originalName || 'foto.jpg'),
+        estimatedSize: originalSize > 0 ? originalSize : UNKNOWN_PHOTO_BYTES,
+      } satisfies ExportPhoto;
+    });
+  }));
+  const photos = photosByCity.flat();
+  if (!photos.length) throw new HttpsError('failed-precondition', 'Todavía no hay fotos para descargar.');
+  const parts = photosByCity.flatMap((cityPhotos, index) => splitIntoParts(selectedCityIds[index], cityPhotos));
   const job = database.collection('trips/japan-2026/exports').doc();
   const expiresAt = Timestamp.fromMillis(Date.now() + EXPORT_LIFETIME_MS);
   const batch = database.batch();
   batch.set(job, {
-    cityId,
+    scope,
     status: 'queued',
     createdBy: uid,
     createdAt: Timestamp.now(),
@@ -98,8 +122,11 @@ export const startCityExport = onCall({ region: REGION, timeoutSeconds: 120 }, a
     batch.set(job.collection('parts').doc(partId), {
       status: 'queued',
       index,
-      photos: part,
-      estimatedBytes: part.reduce((total, photo) => total + photo.estimatedSize, 0),
+      cityId: part.cityId,
+      cityPartIndex: part.cityPartIndex,
+      cityPartCount: part.cityPartCount,
+      photos: part.photos,
+      estimatedBytes: part.photos.reduce((total, photo) => total + photo.estimatedSize, 0),
     });
   });
   await batch.commit();
@@ -137,10 +164,12 @@ export const processCityExport = onTaskDispatched({
   if (!jobSnapshot.exists || !partSnapshot.exists) throw new Error('La exportación no existe.');
   if (partSnapshot.get('status') === 'ready') return;
 
-  const cityId = String(jobSnapshot.get('cityId'));
+  const cityId = String(partSnapshot.get('cityId'));
+  const cityPartIndex = Number(partSnapshot.get('cityPartIndex'));
+  const cityPartCount = Number(partSnapshot.get('cityPartCount'));
   const partCount = Number(jobSnapshot.get('partCount'));
   const photos = partSnapshot.get('photos') as ExportPhoto[];
-  const fileName = `${cityId}-fotos-${partId}-de-${String(partCount).padStart(3, '0')}.zip`;
+  const fileName = cityExportFileName(cityId, cityPartIndex, cityPartCount);
   const objectPath = `exports/${jobId}/${fileName}`;
   const outputFile = getStorage().bucket(EXPORT_BUCKET).file(objectPath);
   await Promise.all([

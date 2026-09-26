@@ -9,11 +9,28 @@ import PhotoViewer from '../components/PhotoViewer';
 import { itinerary } from '../data/itinerary';
 import { createPhotoAssets } from '../photos/createPreview';
 import { getPhotoCapturedAt } from '../photos/captureDate';
+import { evictCachedPhotoBlobs } from '../photos/photoCache';
 import { deletePendingPhoto, listPendingPhotos, savePendingPhoto } from '../photos/pendingUploads';
 import { getCityExportLinks, startCityExport, subscribeToCityExport, type CityExportJob, type CityExportLink } from '../photos/photoExports';
 import { countIndexedCityPhotos, deletePhotoIndex, ensurePhotoIndex, listCityPhotoPage, savePhotoIndex } from '../photos/photoIndex';
 import { deleteCityPhoto, uploadPendingPhoto } from '../photos/photoStorage';
 import { MAX_ORIGINAL_BYTES, type PendingPhoto, type PhotoPageCursor, type PhotoRecord, type UploadStatus } from '../photos/types';
+
+type PageSize = 20 | 50 | 100;
+type BatchItemState = 'waiting' | 'active' | 'saved' | 'pending' | 'error';
+
+interface UploadBatch {
+  id: string;
+  total: number;
+  items: Record<string, BatchItemState>;
+}
+
+const PAGE_SIZE_KEY = 'shiori:photo-page-size';
+
+function initialPageSize(): PageSize {
+  const saved = Number(localStorage.getItem(PAGE_SIZE_KEY));
+  return saved === 50 || saved === 100 ? saved : 20;
+}
 
 async function runTwoAtATime<T>(items: T[], worker: (item: T) => Promise<void>) {
   let index = 0;
@@ -43,14 +60,17 @@ function formatBytes(bytes: number) {
 function PhotosContent() {
   const { cityId } = useParams();
   const city = cityId ? itinerary.cities.find((entry) => entry.id === cityId) : undefined;
+  const exportScope = city?.id ?? 'all';
   const { user, loading, error: authError } = useAuth();
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [nextCursor, setNextCursor] = useState<PhotoPageCursor | null>(null);
+  const [pageSize, setPageSize] = useState<PageSize>(initialPageSize);
   const [loadingMore, setLoadingMore] = useState(false);
   const [cityPhotoCount, setCityPhotoCount] = useState(0);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
+  const [uploadBatch, setUploadBatch] = useState<UploadBatch | null>(null);
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [loadingPhotoCounts, setLoadingPhotoCounts] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
@@ -81,13 +101,20 @@ function PhotosContent() {
     statusTimers.current.set(id, timer);
   }, []);
 
+  const updateBatchItem = useCallback((batchId: string | undefined, itemId: string, state: BatchItemState) => {
+    if (!batchId) return;
+    setUploadBatch((current) => current?.id === batchId
+      ? { ...current, items: { ...current.items, [itemId]: state } }
+      : current);
+  }, []);
+
   const refreshGallery = useCallback(async () => {
     if (!user || !city || !indexReady) return;
     setLoadingPhotos(true);
     setGalleryError(null);
     try {
       const [page, count] = await Promise.all([
-        listCityPhotoPage(city.id),
+        listCityPhotoPage(city.id, pageSize),
         countIndexedCityPhotos(city.id),
       ]);
       setPhotos(page.photos);
@@ -98,14 +125,14 @@ function PhotosContent() {
     } finally {
       setLoadingPhotos(false);
     }
-  }, [city, indexReady, user]);
+  }, [city, indexReady, pageSize, user]);
 
   const loadMorePhotos = useCallback(async () => {
     if (!city || !nextCursor || loadingMore) return;
     setLoadingMore(true);
     setGalleryError(null);
     try {
-      const page = await listCityPhotoPage(city.id, nextCursor);
+      const page = await listCityPhotoPage(city.id, pageSize, nextCursor);
       setPhotos((current) => {
         const byId = new Map(current.map((photo) => [photo.photoId, photo]));
         page.photos.forEach((photo) => byId.set(photo.photoId, photo));
@@ -117,11 +144,12 @@ function PhotosContent() {
     } finally {
       setLoadingMore(false);
     }
-  }, [city, loadingMore, nextCursor]);
+  }, [city, loadingMore, nextCursor, pageSize]);
 
   const processPending = useCallback(async (pending: PendingPhoto) => {
     if (!user || inFlight.current.has(pending.id)) return;
     inFlight.current.add(pending.id);
+    updateBatchItem(pending.batchId, pending.id, 'active');
     let prepared = pending;
     const updateStatus = (update: Partial<UploadStatus>) => setStatuses((current) => ({
       ...current,
@@ -146,6 +174,7 @@ function PhotosContent() {
       }
       if (!navigator.onLine) {
         updateStatus({ state: 'queued', message: 'Guardada en el teléfono; esperando conexión.' });
+        updateBatchItem(pending.batchId, pending.id, 'pending');
         return;
       }
       updateStatus({ state: 'uploading', message: 'Subiendo a la nube…' });
@@ -155,18 +184,21 @@ function PhotosContent() {
       await savePhotoIndex(record);
       await deletePendingPhoto(prepared.id);
       updateStatus({ state: 'saved', progress: 1, message: 'Guardada en la nube.' });
+      updateBatchItem(pending.batchId, pending.id, 'saved');
       if (prepared.cityId === city?.id) {
         setPhotos((current) => [record, ...current.filter((photo) => photo.photoId !== record.photoId)]
-          .sort((left, right) => right.sortAt.localeCompare(left.sortAt) || right.photoId.localeCompare(left.photoId)));
+          .sort((left, right) => right.sortAt.localeCompare(left.sortAt) || right.photoId.localeCompare(left.photoId))
+          .slice(0, Math.max(pageSize, current.length)));
         setCityPhotoCount((current) => current + 1);
       }
       scheduleStatusRemoval(pending.id);
     } catch (error) {
       updateStatus({ state: 'queued', message: uploadErrorMessage(error) });
+      updateBatchItem(pending.batchId, pending.id, 'pending');
     } finally {
       inFlight.current.delete(pending.id);
     }
-  }, [city?.id, scheduleStatusRemoval, user]);
+  }, [city?.id, pageSize, scheduleStatusRemoval, updateBatchItem, user]);
 
   const resumePending = useCallback(async () => {
     if (!user || !indexReady) return;
@@ -244,8 +276,8 @@ function PhotosContent() {
     setExportLinks([]);
     setExportError(null);
     setLinksRequestedFor(null);
-    setExportJobId(city ? localStorage.getItem(`shiori:city-export:${city.id}`) : null);
-  }, [city]);
+    setExportJobId(localStorage.getItem(`shiori:photo-export:${exportScope}`));
+  }, [exportScope]);
 
   useEffect(() => {
     if (!user || !exportJobId) return;
@@ -271,14 +303,14 @@ function PhotosContent() {
   }, [exportJob?.status, exportJobId, linksRequestedFor, refreshExportLinks]);
 
   async function handleStartExport() {
-    if (!city || startingExport) return;
+    if (!user || startingExport) return;
     setStartingExport(true);
     setExportError(null);
     setExportLinks([]);
     setLinksRequestedFor(null);
     try {
-      const result = await startCityExport(city.id);
-      localStorage.setItem(`shiori:city-export:${city.id}`, result.jobId);
+      const result = await startCityExport(exportScope);
+      localStorage.setItem(`shiori:photo-export:${exportScope}`, result.jobId);
       setExportJobId(result.jobId);
     } catch (error) {
       setExportError(uploadErrorMessage(error));
@@ -291,20 +323,31 @@ function PhotosContent() {
     if (!city || !indexReady) return;
     const files = [...(event.target.files ?? [])];
     event.target.value = '';
+    if (!files.length) return;
+    const batchId = crypto.randomUUID();
+    const batchItems = files.map((file) => ({ file, id: `${Date.now()}-${crypto.randomUUID()}` }));
+    setUploadBatch({
+      id: batchId,
+      total: batchItems.length,
+      items: Object.fromEntries(batchItems.map(({ id }) => [id, 'waiting' as const])),
+    });
 
-    await runTwoAtATime(files, async (file) => {
-      const id = `${Date.now()}-${crypto.randomUUID()}`;
+    await runTwoAtATime(batchItems, async ({ file, id }) => {
+      updateBatchItem(batchId, id, 'active');
       if (!file.type.startsWith('image/')) {
         setStatuses((current) => ({ ...current, [id]: { id, cityId: city.id, fileName: file.name, state: 'error', progress: 0, message: 'El archivo no es una imagen.' } }));
+        updateBatchItem(batchId, id, 'error');
         return;
       }
       if (file.size > MAX_ORIGINAL_BYTES) {
         setStatuses((current) => ({ ...current, [id]: { id, cityId: city.id, fileName: file.name, state: 'error', progress: 0, message: 'La foto supera el máximo de 30 MB.' } }));
+        updateBatchItem(batchId, id, 'error');
         return;
       }
       const createdAt = new Date().toISOString();
       const pending: PendingPhoto = {
         id,
+        batchId,
         photoId: id,
         cityId: city.id,
         original: file,
@@ -318,12 +361,37 @@ function PhotosContent() {
         await processPending(pending);
       } catch {
         setStatuses((current) => ({ ...current, [id]: { id, cityId: city.id, fileName: file.name, state: 'error', progress: 0, message: 'No hubo espacio para guardar la copia temporal.' } }));
+        updateBatchItem(batchId, id, 'error');
       }
     });
+    if (navigator.onLine) await refreshGallery();
   }
 
   if (cityId && !city) return <NotFound />;
   const cityStatuses = Object.values(statuses).filter((status) => status.cityId === city?.id);
+  const totalTripPhotos = Object.values(photoCounts).reduce((total, count) => total + count, 0);
+  const batchStates = uploadBatch ? Object.values(uploadBatch.items) : [];
+  const batchSaved = batchStates.filter((state) => state === 'saved').length;
+  const batchActive = batchStates.filter((state) => state === 'active').length;
+  const batchWaiting = batchStates.filter((state) => state === 'waiting').length;
+  const batchPending = batchStates.filter((state) => state === 'pending').length;
+  const batchErrors = batchStates.filter((state) => state === 'error').length;
+  const batchUploading = batchActive + batchWaiting > 0;
+  const exportBusy = startingExport || exportJob?.status === 'queued' || exportJob?.status === 'processing';
+  const exportPanel = (exportJob || exportError) && <section className="city-export" aria-live="polite">
+    {exportJob?.status === 'queued' && <p>La descarga está en cola.</p>}
+    {exportJob?.status === 'processing' && <p>Preparando archivos ZIP: {exportJob.completedParts} de {exportJob.partCount} listos. Podés cerrar la página y volver después.</p>}
+    {exportJob?.status === 'ready' && <>
+      <p>Descarga lista en {exportJob.partCount} {exportJob.partCount === 1 ? 'archivo' : 'archivos'}. Los enlaces duran una hora.</p>
+      {loadingExportLinks ? <span>Generando enlaces…</span> : <div className="city-export-links">
+        {exportLinks.map((link) => <a href={link.url} key={link.fileName}>Descargar {link.fileName} · {formatBytes(link.size)}</a>)}
+        <button type="button" onClick={() => { void refreshExportLinks(); }}>Renovar enlaces</button>
+      </div>}
+    </>}
+    {exportJob?.status === 'error' && <p>No se pudo preparar la descarga. Podés crearla nuevamente.</p>}
+    {exportJob?.status === 'expired' && <p>La descarga anterior venció. Podés prepararla nuevamente desde el botón.</p>}
+    {exportError && <p className="photo-export-error" role="alert">{exportError}</p>}
+  </section>;
 
   return <div className="page-shell photos-page">
     <Link className="back-link" to={city ? '/photos' : '/'}>{city ? '← Todas las ciudades' : '← Todo el viaje'}</Link>
@@ -344,6 +412,16 @@ function PhotosContent() {
       {authError && <p className="auth-error" role="alert">{authError}</p>}
     </section>}
 
+    {!city && user && <>
+      <section className="photo-all-export">
+        <div><h2>Descargar todo el viaje</h2><p>Un ZIP por ciudad; las ciudades grandes se dividen en partes de hasta 4 GB o 500 fotos.</p></div>
+        <button className="download-city-button" type="button" disabled={!indexReady || loadingPhotoCounts || totalTripPhotos === 0 || exportBusy} onClick={() => { void handleStartExport(); }}>
+          {startingExport ? 'Iniciando…' : exportJob?.status === 'queued' || exportJob?.status === 'processing' ? 'Preparando ZIP…' : exportJob?.status === 'ready' ? 'Actualizar descarga' : exportJob?.status === 'expired' ? 'Preparar de nuevo' : 'Descargar todo'}
+        </button>
+      </section>
+      {exportPanel}
+    </>}
+
     {!city && <div className="photo-city-grid" aria-label="Galerías por ciudad">
       {itinerary.cities.map((entry) => {
         const count = photoCounts[entry.id];
@@ -363,27 +441,39 @@ function PhotosContent() {
       <section className="photo-toolbar">
         <div><h2>Galería</h2><p>{cityPhotoCount ? `${cityPhotoCount} ${cityPhotoCount === 1 ? 'foto guardada' : 'fotos guardadas'}` : 'Todavía no hay fotos guardadas.'}</p></div>
         <div className="photo-toolbar-actions">
-          <button className="download-city-button" type="button" disabled={!indexReady || cityPhotoCount === 0 || startingExport || exportJob?.status === 'queued' || exportJob?.status === 'processing'} onClick={() => { void handleStartExport(); }}>
+          <button className="download-city-button" type="button" disabled={!indexReady || cityPhotoCount === 0 || exportBusy} onClick={() => { void handleStartExport(); }}>
             {startingExport ? 'Iniciando…' : exportJob?.status === 'queued' || exportJob?.status === 'processing' ? 'Preparando ZIP…' : exportJob?.status === 'ready' ? 'Actualizar descarga' : exportJob?.status === 'expired' ? 'Preparar de nuevo' : 'Descargar ciudad'}
           </button>
-          <button className="upload-button" type="button" disabled={!indexReady} onClick={() => inputRef.current?.click()}>Agregar fotos</button>
+          <button className="upload-button" type="button" disabled={!indexReady || batchUploading} onClick={() => inputRef.current?.click()}>Agregar fotos</button>
         </div>
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => { void handleFiles(event); }} />
       </section>
 
-      {(exportJob || exportError) && <section className="city-export" aria-live="polite">
-        {exportJob?.status === 'queued' && <p>La descarga está en cola.</p>}
-        {exportJob?.status === 'processing' && <p>Preparando archivos ZIP: {exportJob.completedParts} de {exportJob.partCount} listos. Podés cerrar la página y volver después.</p>}
-        {exportJob?.status === 'ready' && <>
-          <p>Descarga lista en {exportJob.partCount} {exportJob.partCount === 1 ? 'archivo' : 'archivos'}. Los enlaces duran una hora.</p>
-          {loadingExportLinks ? <span>Generando enlaces…</span> : <div className="city-export-links">
-            {exportLinks.map((link, index) => <a href={link.url} key={link.fileName}>Descargar {exportJob.partCount === 1 ? 'ZIP' : `parte ${index + 1}`} · {formatBytes(link.size)}</a>)}
-            <button type="button" onClick={() => { void refreshExportLinks(); }}>Renovar enlaces</button>
-          </div>}
-        </>}
-        {exportJob?.status === 'error' && <p>No se pudo preparar la descarga. Podés crearla nuevamente.</p>}
-        {exportJob?.status === 'expired' && <p>La descarga anterior venció. Podés prepararla nuevamente desde el botón.</p>}
-        {exportError && <p className="photo-export-error" role="alert">{exportError}</p>}
+      <div className="gallery-page-size">
+        <label htmlFor="photo-page-size">Fotos por página</label>
+        <select id="photo-page-size" value={pageSize} onChange={(event) => {
+          const nextPageSize = Number(event.target.value) as PageSize;
+          localStorage.setItem(PAGE_SIZE_KEY, String(nextPageSize));
+          setPageSize(nextPageSize);
+        }}>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </div>
+
+      {exportPanel}
+
+      {uploadBatch && <section className={`upload-batch-summary ${batchUploading ? 'is-active' : 'is-finished'}`} aria-live="polite">
+        <div>
+          <strong>{batchUploading ? `Subiendo ${batchSaved} de ${uploadBatch.total}` : `Se subieron ${batchSaved}/${uploadBatch.total} fotos`}</strong>
+          <span>{batchActive > 0 ? `${batchActive} en curso` : ''}{batchActive > 0 && batchWaiting > 0 ? ' · ' : ''}{batchWaiting > 0 ? `${batchWaiting} por cargar` : ''}{batchPending > 0 ? `${batchActive + batchWaiting > 0 ? ' · ' : ''}${batchPending} pendientes de reintento` : ''}{batchErrors > 0 ? `${batchActive + batchWaiting + batchPending > 0 ? ' · ' : ''}${batchErrors} con error` : ''}</span>
+        </div>
+        <progress value={batchSaved} max={uploadBatch.total}>{batchSaved} de {uploadBatch.total}</progress>
+        {!batchUploading && <div className="upload-batch-actions">
+          {batchPending > 0 && <button type="button" onClick={() => { void resumePending(); }}>Reintentar pendientes</button>}
+          <button type="button" onClick={() => setUploadBatch(null)}>Cerrar</button>
+        </div>}
       </section>}
 
       {cityStatuses.length > 0 && <div className="upload-list" aria-live="polite">
@@ -406,6 +496,7 @@ function PhotosContent() {
     {selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} onDelete={async () => {
       await deleteCityPhoto(selectedPhoto);
       await deletePhotoIndex(selectedPhoto);
+      await evictCachedPhotoBlobs([selectedPhoto.thumbnailPath, selectedPhoto.previewPath]);
       setPhotos((current) => current.filter((photo) => photo.photoId !== selectedPhoto.photoId));
       setCityPhotoCount((current) => Math.max(0, current - 1));
       setSelectedPhoto(null);

@@ -77,7 +77,9 @@ quede completa en memoria. Si se pierde la conexión, conserva lo pendiente en
 ese navegador y reintenta al volver a estar online. El original admite hasta
 30 MB y no se modifica. Se generan una miniatura de hasta 512 KB para la grilla
 y una vista previa de hasta 2 MB para el visor. El original solo se descarga
-cuando se toca «Descargar original».
+cuando se toca «Descargar original». Durante una selección múltiple se muestra
+cuántas fotos están activas, pendientes, guardadas o con error y el resultado
+final del lote.
 
 Los objetos se guardan en:
 
@@ -88,10 +90,15 @@ trips/japan-2026/photos/{cityId}/{photoId}/preview.jpg
 ```
 
 Cloud Storage sigue siendo la fuente definitiva. Firestore guarda un índice
-reconstruible con el orden, las rutas y el tamaño. La galería lee 50 fotos por
-página y obtiene el total sin recorrer todo el bucket. La primera sesión después
+reconstruible con el orden, las rutas y el tamaño. La galería lee 20 fotos por
+página de forma predeterminada; puede cambiarse a 50 o 100 y la preferencia se
+guarda localmente. Obtiene el total sin recorrer todo el bucket. La primera sesión después
 de habilitar Firestore migra automáticamente las fotos anteriores; las Cloud
 Functions mantienen el índice ante futuras subidas y borrados.
+
+Las miniaturas cercanas a la pantalla se descargan con concurrencia limitada y
+aparecen progresivamente sobre placeholders. Se guardan en Cache Storage porque
+sus rutas son inmutables; al borrar una foto también se elimina su copia local.
 
 Las fotos nuevas se ordenan desde la captura más reciente. La app lee la fecha
 EXIF cuando está disponible y usa la fecha del archivo o de subida como respaldo;
@@ -104,12 +111,12 @@ persona lea solamente las exportaciones que pidió. Al borrar una foto, la
 aplicación elimina original, miniatura, vista previa e índice; la política de
 Soft Delete del bucket permite recuperar los archivos durante 30 días.
 
-El botón «Descargar ciudad» crea ZIP de aproximadamente 1,5 GB para que una
-ciudad con decenas de GB no dependa de una única tarea enorme. Las tareas leen
-los originales directamente desde Storage y escriben las partes en el bucket
-temporal `shiori-japan-2026-exports`. La app muestra el avance y enlaces
-temporales cuando termina. El bucket debe borrar automáticamente sus objetos a
-las 48 horas.
+Los botones «Descargar ciudad» y «Descargar todo» crean un ZIP por ciudad. Si una
+ciudad supera 4 GB o 500 fotos, se divide como `fotos-tokyo-1.zip`,
+`fotos-tokyo-2.zip`, etc. Las tareas leen los originales directamente desde
+Storage y escriben las partes en el bucket temporal
+`shiori-japan-2026-exports`. La app muestra el avance y enlaces temporales cuando
+termina. El bucket debe borrar automáticamente sus objetos a las 48 horas.
 
 Para desarrollar y verificar toda la galería:
 

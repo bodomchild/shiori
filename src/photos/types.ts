@@ -4,6 +4,7 @@ export const MAX_THUMBNAIL_BYTES = 512 * 1024;
 
 export interface PendingPhoto {
   id: string;
+  batchId?: string;
   photoId: string;
   cityId: string;
   original: Blob;
