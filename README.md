@@ -92,13 +92,23 @@ trips/japan-2026/photos/{cityId}/{photoId}/preview.jpg
 Cloud Storage sigue siendo la fuente definitiva. Firestore guarda un índice
 reconstruible con el orden, las rutas y el tamaño. La galería lee 20 fotos por
 página de forma predeterminada; puede cambiarse a 50 o 100 y la preferencia se
-guarda localmente. Obtiene el total sin recorrer todo el bucket. La primera sesión después
-de habilitar Firestore migra automáticamente las fotos anteriores; las Cloud
-Functions mantienen el índice ante futuras subidas y borrados.
+guarda localmente. Obtiene el total sin recorrer todo el bucket y sin retrasar la
+consulta de fotos. La migración inicial de Storage a Firestore ya se completó;
+no se comprueba al abrir la galería. Las Cloud Functions mantienen el índice
+ante futuras subidas y borrados.
 
-Las miniaturas cercanas a la pantalla se descargan con concurrencia limitada y
-aparecen progresivamente sobre placeholders. Se guardan en Cache Storage porque
-sus rutas son inmutables; al borrar una foto también se elimina su copia local.
+Todas las miniaturas de cada página empiezan a cargarse al recibir sus datos,
+sin esperar al scroll. Cada foto reemplaza su propio placeholder cuando termina,
+sin esperar al resto. Se guardan en Cache Storage porque sus rutas son inmutables;
+una caché en memoria de hasta 32 MB evita releer los mismos archivos al navegar.
+Al borrar una foto también se elimina su copia local.
+
+Firestore guarda los datos consultados en una caché persistente: al volver a una
+ciudad se muestran primero las fotos conocidas y se actualizan desde el servidor
+en segundo plano. Una actualización conserva la grilla visible. Los conteos y
+los botones de descarga no dependen de esa actualización. La caché no convierte
+la aplicación en una PWA y no garantiza que todo el viaje esté disponible sin
+conexión. Solo las dos cuentas habilitadas pueden abrir la galería local.
 
 Las fotos nuevas se ordenan desde la captura más reciente. La app lee la fecha
 EXIF cuando está disponible y usa la fecha del archivo o de subida como respaldo;
@@ -128,6 +138,7 @@ Para desarrollar y verificar toda la galería:
 ```sh
 npm run test:storage
 npm run test:firestore
+npm run test:gallery
 cd functions
 npm ci
 npm run build

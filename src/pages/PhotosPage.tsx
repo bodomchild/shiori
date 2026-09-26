@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { Link, useParams } from 'react-router-dom';
 import AuthProvider from '../auth/AuthProvider';
 import { useAuth } from '../auth/AuthContext';
+import { canAccessPhotos } from '../auth/photoAccess';
 import AuthButton from '../components/AuthButton';
 import NotFound from '../components/NotFound';
 import PhotoThumbnail from '../components/PhotoThumbnail';
@@ -12,7 +13,7 @@ import { getPhotoCapturedAt } from '../photos/captureDate';
 import { evictCachedPhotoBlobs } from '../photos/photoCache';
 import { deletePendingPhoto, listPendingPhotos, savePendingPhoto } from '../photos/pendingUploads';
 import { getCityExportLinks, startCityExport, subscribeToCityExport, type CityExportJob, type CityExportLink } from '../photos/photoExports';
-import { countIndexedCityPhotos, deletePhotoIndex, ensurePhotoIndex, listCityPhotoPage, savePhotoIndex } from '../photos/photoIndex';
+import { countIndexedCityPhotos, deletePhotoIndex, listCityPhotoPage, savePhotoIndex, type CityPhotoPage } from '../photos/photoIndex';
 import { deleteCityPhoto, uploadPendingPhoto } from '../photos/photoStorage';
 import { MAX_ORIGINAL_BYTES, type PendingPhoto, type PhotoPageCursor, type PhotoRecord, type UploadStatus } from '../photos/types';
 
@@ -60,6 +61,13 @@ function exportErrorMessage(error: unknown) {
   return 'No se pudo preparar la descarga. Probá nuevamente.';
 }
 
+function galleryErrorMessage(error: unknown) {
+  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+  if (code === 'permission-denied' || code === 'unauthenticated') return 'Esta cuenta no tiene permiso para ver las fotos.';
+  if (!navigator.onLine) return 'No hay conexión y estas fotos todavía no están guardadas en este dispositivo.';
+  return 'No se pudo cargar la galería. Probá nuevamente.';
+}
+
 function formatBytes(bytes: number) {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   if (bytes >= 1024 ** 2) return `${Math.ceil(bytes / 1024 ** 2)} MB`;
@@ -71,11 +79,14 @@ function PhotosContent() {
   const city = cityId ? itinerary.cities.find((entry) => entry.id === cityId) : undefined;
   const exportScope = city?.id ?? 'all';
   const { user, loading, error: authError } = useAuth();
+  const hasPhotoAccess = canAccessPhotos(user?.uid);
+  const galleryScope = `${user?.uid ?? ''}:${city?.id ?? ''}`;
   const [photos, setPhotos] = useState<PhotoRecord[]>([]);
   const [nextCursor, setNextCursor] = useState<PhotoPageCursor | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(initialPageSize);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [cityPhotoCount, setCityPhotoCount] = useState(0);
+  const [cityPhotoCount, setCityPhotoCount] = useState<number | null>(null);
+  const [countFailed, setCountFailed] = useState(false);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [galleryError, setGalleryError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
@@ -83,7 +94,6 @@ function PhotosContent() {
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [loadingPhotoCounts, setLoadingPhotoCounts] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
-  const [indexReady, setIndexReady] = useState(false);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [exportJob, setExportJob] = useState<CityExportJob | null>(null);
   const [exportLinks, setExportLinks] = useState<CityExportLink[]>([]);
@@ -93,6 +103,10 @@ function PhotosContent() {
   const [linksRequestedFor, setLinksRequestedFor] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const exportStartingRef = useRef(false);
+  const galleryScopeRef = useRef<string | null>(galleryScope);
+  const galleryRequestRef = useRef(0);
+  const countRequestRef = useRef(0);
+  galleryScopeRef.current = galleryScope;
   const inFlight = useRef(new Set<string>());
   const statusTimers = useRef(new Map<string, number>());
 
@@ -119,30 +133,61 @@ function PhotosContent() {
   }, []);
 
   const refreshGallery = useCallback(async () => {
-    if (!user || !city || !indexReady) return;
-    setLoadingPhotos(true);
-    setGalleryError(null);
-    try {
-      const [page, count] = await Promise.all([
-        listCityPhotoPage(city.id, pageSize),
-        countIndexedCityPhotos(city.id),
-      ]);
+    if (!hasPhotoAccess || !city) return;
+    const requestId = ++galleryRequestRef.current;
+    const isCurrent = () => galleryScopeRef.current === galleryScope && galleryRequestRef.current === requestId;
+    const showPage = (page: CityPhotoPage) => {
+      if (!isCurrent()) return;
       setPhotos(page.photos);
       setNextCursor(page.nextCursor);
-      setCityPhotoCount(count);
+    };
+    const showCachedPage = (page: CityPhotoPage) => {
+      if (!isCurrent()) return;
+      // Al refrescar, conservar la grilla actual hasta recibir datos nuevos.
+      setPhotos((current) => current.length > 0 ? current : page.photos);
+      setNextCursor((current) => current ?? page.nextCursor);
+    };
+    setLoadingPhotos(true);
+    setLoadingMore(false);
+    setGalleryError(null);
+    try {
+      showPage(await listCityPhotoPage(city.id, pageSize, undefined, showCachedPage));
     } catch (error) {
-      setGalleryError(uploadErrorMessage(error));
+      if (isCurrent()) {
+        const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+        if (code === 'permission-denied' || code === 'unauthenticated') {
+          setPhotos([]);
+          setNextCursor(null);
+        }
+        setGalleryError(galleryErrorMessage(error));
+      }
     } finally {
-      setLoadingPhotos(false);
+      if (isCurrent()) setLoadingPhotos(false);
     }
-  }, [city, indexReady, pageSize, user]);
+  }, [city, galleryScope, hasPhotoAccess, pageSize]);
+
+  const refreshCityCount = useCallback(async () => {
+    if (!hasPhotoAccess || !city) return;
+    const requestId = ++countRequestRef.current;
+    const isCurrent = () => galleryScopeRef.current === galleryScope && countRequestRef.current === requestId;
+    setCountFailed(false);
+    try {
+      const count = await countIndexedCityPhotos(city.id);
+      if (isCurrent()) setCityPhotoCount(count);
+    } catch {
+      if (isCurrent()) setCountFailed(true);
+    }
+  }, [city, galleryScope, hasPhotoAccess]);
 
   const loadMorePhotos = useCallback(async () => {
-    if (!city || !nextCursor || loadingMore) return;
+    if (!hasPhotoAccess || !city || !nextCursor || loadingMore || loadingPhotos) return;
+    const requestId = galleryRequestRef.current;
+    const isCurrent = () => galleryScopeRef.current === galleryScope && galleryRequestRef.current === requestId;
     setLoadingMore(true);
     setGalleryError(null);
     try {
       const page = await listCityPhotoPage(city.id, pageSize, nextCursor);
+      if (!isCurrent()) return;
       setPhotos((current) => {
         const byId = new Map(current.map((photo) => [photo.photoId, photo]));
         page.photos.forEach((photo) => byId.set(photo.photoId, photo));
@@ -150,14 +195,14 @@ function PhotosContent() {
       });
       setNextCursor(page.nextCursor);
     } catch (error) {
-      setGalleryError(uploadErrorMessage(error));
+      if (isCurrent()) setGalleryError(galleryErrorMessage(error));
     } finally {
-      setLoadingMore(false);
+      if (isCurrent()) setLoadingMore(false);
     }
-  }, [city, loadingMore, nextCursor, pageSize]);
+  }, [city, galleryScope, hasPhotoAccess, loadingMore, loadingPhotos, nextCursor, pageSize]);
 
   const processPending = useCallback(async (pending: PendingPhoto) => {
-    if (!user || inFlight.current.has(pending.id)) return;
+    if (!user || !hasPhotoAccess || inFlight.current.has(pending.id)) return;
     inFlight.current.add(pending.id);
     updateBatchItem(pending.batchId, pending.id, 'active');
     let prepared = pending;
@@ -195,11 +240,11 @@ function PhotosContent() {
       await deletePendingPhoto(prepared.id);
       updateStatus({ state: 'saved', progress: 1, message: 'Guardada en la nube.' });
       updateBatchItem(pending.batchId, pending.id, 'saved');
-      if (prepared.cityId === city?.id) {
+      if (prepared.cityId === city?.id && galleryScopeRef.current === galleryScope) {
         setPhotos((current) => [record, ...current.filter((photo) => photo.photoId !== record.photoId)]
           .sort((left, right) => right.sortAt.localeCompare(left.sortAt) || right.photoId.localeCompare(left.photoId))
           .slice(0, Math.max(pageSize, current.length)));
-        setCityPhotoCount((current) => current + 1);
+        setCityPhotoCount((current) => current === null ? null : current + 1);
       }
       scheduleStatusRemoval(pending.id);
     } catch (error) {
@@ -208,44 +253,41 @@ function PhotosContent() {
     } finally {
       inFlight.current.delete(pending.id);
     }
-  }, [city?.id, pageSize, scheduleStatusRemoval, updateBatchItem, user]);
+  }, [city?.id, galleryScope, hasPhotoAccess, pageSize, scheduleStatusRemoval, updateBatchItem, user]);
 
   const resumePending = useCallback(async () => {
-    if (!user || !indexReady) return;
+    if (!user || !hasPhotoAccess) return;
     try {
       await runTwoAtATime(await listPendingPhotos(), processPending);
     } catch (error) {
       setGalleryError(uploadErrorMessage(error));
     }
-  }, [indexReady, processPending, user]);
+  }, [hasPhotoAccess, processPending, user]);
 
   useEffect(() => {
-    if (!user) {
-      setIndexReady(false);
-      return;
-    }
-    let active = true;
-    setIndexReady(false);
-    setGalleryError(null);
-    void ensurePhotoIndex(itinerary.cities.map((entry) => entry.id)).then(() => {
-      if (active) setIndexReady(true);
-    }).catch((error) => {
-      if (active) setGalleryError(uploadErrorMessage(error));
-    });
-    return () => { active = false; };
-  }, [user]);
-
-  useEffect(() => { void refreshGallery(); }, [refreshGallery]);
-
-  useEffect(() => {
+    galleryScopeRef.current = galleryScope;
+    galleryRequestRef.current += 1;
+    countRequestRef.current += 1;
     setPhotos([]);
     setNextCursor(null);
-    setCityPhotoCount(0);
+    setCityPhotoCount(null);
+    setCountFailed(false);
+    setLoadingPhotos(false);
+    setLoadingMore(false);
+    setGalleryError(null);
     setSelectedPhoto(null);
-  }, [city?.id, user?.uid]);
+    return () => {
+      galleryScopeRef.current = null;
+      galleryRequestRef.current += 1;
+      countRequestRef.current += 1;
+    };
+  }, [galleryScope]);
+
+  useEffect(() => { void refreshGallery(); }, [refreshGallery]);
+  useEffect(() => { void refreshCityCount(); }, [refreshCityCount]);
 
   useEffect(() => {
-    if (!user || city || !indexReady) {
+    if (!hasPhotoAccess || city) {
       setPhotoCounts({});
       setLoadingPhotoCounts(false);
       return;
@@ -258,6 +300,8 @@ function PhotosContent() {
     itinerary.cities.forEach((entry) => {
       void countIndexedCityPhotos(entry.id).then((count) => {
         if (active) setPhotoCounts((current) => ({ ...current, [entry.id]: count }));
+      }).catch(() => {
+        // Un conteo fallido no bloquea las otras ciudades ni las descargas.
       }).finally(() => {
         remaining -= 1;
         if (active && remaining === 0) setLoadingPhotoCounts(false);
@@ -265,7 +309,7 @@ function PhotosContent() {
     });
 
     return () => { active = false; };
-  }, [city, indexReady, user]);
+  }, [city, hasPhotoAccess, user?.uid]);
 
   useEffect(() => () => {
     statusTimers.current.forEach((timer) => window.clearTimeout(timer));
@@ -287,9 +331,9 @@ function PhotosContent() {
   }, [exportScope]);
 
   useEffect(() => {
-    if (!user || !exportJobId) return;
+    if (!hasPhotoAccess || !exportJobId) return;
     return subscribeToCityExport(exportJobId, setExportJob, (error) => setExportError(exportErrorMessage(error)));
-  }, [exportJobId, user]);
+  }, [exportJobId, hasPhotoAccess, user?.uid]);
 
   const refreshExportLinks = useCallback(async () => {
     if (!exportJobId) return;
@@ -310,17 +354,18 @@ function PhotosContent() {
   }, [exportJob?.status, exportJobId, linksRequestedFor, refreshExportLinks]);
 
   async function handleStartExport() {
-    if (!user || exportStartingRef.current) return;
+    if (!user || !hasPhotoAccess || exportStartingRef.current || exportJob?.status === 'queued' || exportJob?.status === 'processing') return;
     exportStartingRef.current = true;
     setStartingExport(true);
     setExportError(null);
     setExportLinks([]);
     setLinksRequestedFor(null);
+    setExportJobId(null);
     setExportJob({
       id: 'starting',
       status: 'queued',
       scope: exportScope,
-      photoCount: city ? cityPhotoCount : totalTripPhotos,
+      photoCount: city ? cityPhotoCount ?? 0 : totalTripPhotos,
       partCount: 0,
       completedParts: 0,
     });
@@ -331,7 +376,7 @@ function PhotosContent() {
         id: result.jobId,
         status: 'queued',
         scope: exportScope,
-        photoCount: city ? cityPhotoCount : totalTripPhotos,
+        photoCount: city ? cityPhotoCount ?? 0 : totalTripPhotos,
         partCount: result.partCount,
         completedParts: 0,
       });
@@ -346,7 +391,7 @@ function PhotosContent() {
   }
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    if (!city || !indexReady) return;
+    if (!city || !hasPhotoAccess) return;
     const files = [...(event.target.files ?? [])];
     event.target.value = '';
     if (!files.length) return;
@@ -390,7 +435,10 @@ function PhotosContent() {
         updateBatchItem(batchId, id, 'error');
       }
     });
-    if (navigator.onLine) await refreshGallery();
+    if (navigator.onLine) {
+      void refreshCityCount();
+      await refreshGallery();
+    }
   }
 
   if (cityId && !city) return <NotFound />;
@@ -437,11 +485,12 @@ function PhotosContent() {
       <AuthButton />
       {authError && <p className="auth-error" role="alert">{authError}</p>}
     </section>}
+    {user && !hasPhotoAccess && <p className="gallery-error" role="alert">Esta cuenta no está habilitada para ver las fotos. Ingresá con la cuenta de Lore o Fer.</p>}
 
-    {!city && user && <>
+    {!city && hasPhotoAccess && <>
       <section className="photo-all-export">
         <div><h2>Descargar todo el viaje</h2><p>Un ZIP por ciudad; las ciudades grandes se dividen en partes de hasta 4 GB o 500 fotos.</p></div>
-        <button className="download-city-button" type="button" disabled={!indexReady || (!loadingPhotoCounts && totalTripPhotos === 0) || exportBusy} onClick={() => { void handleStartExport(); }}>
+        <button className="download-city-button" type="button" disabled={exportBusy} onClick={() => { void handleStartExport(); }}>
           {startingExport ? 'Iniciando…' : exportJob?.status === 'queued' || exportJob?.status === 'processing' ? 'Preparando ZIP…' : exportJob?.status === 'ready' ? 'Actualizar descarga' : exportJob?.status === 'expired' ? 'Preparar de nuevo' : 'Descargar todo'}
         </button>
       </section>
@@ -451,7 +500,7 @@ function PhotosContent() {
     {!city && <div className="photo-city-grid" aria-label="Galerías por ciudad">
       {itinerary.cities.map((entry) => {
         const count = photoCounts[entry.id];
-        const summary = !user ? 'Abrir fotos' : !indexReady ? 'Preparando galería…' : count !== undefined
+        const summary = !hasPhotoAccess ? 'Abrir fotos' : count !== undefined
           ? `${count} ${count === 1 ? 'foto' : 'fotos'}`
           : loadingPhotoCounts ? 'Contando fotos…' : 'Cantidad no disponible';
         return <Link to={`/photos/${entry.id}`} key={entry.id}>
@@ -460,17 +509,17 @@ function PhotosContent() {
       })}
     </div>}
 
-    {city && user && <>
+    {city && hasPhotoAccess && <>
       <nav className="photo-city-nav" aria-label="Cambiar ciudad">
         {itinerary.cities.map((entry) => <Link className={entry.id === city.id ? 'is-current' : ''} to={`/photos/${entry.id}`} key={entry.id}>{entry.name}</Link>)}
       </nav>
       <section className="photo-toolbar">
-        <div><h2>Galería</h2><p>{cityPhotoCount ? `${cityPhotoCount} ${cityPhotoCount === 1 ? 'foto guardada' : 'fotos guardadas'}` : 'Todavía no hay fotos guardadas.'}</p></div>
+        <div><h2>Galería</h2><p>{cityPhotoCount === null ? countFailed ? 'Cantidad no disponible.' : 'Contando fotos…' : cityPhotoCount ? `${cityPhotoCount} ${cityPhotoCount === 1 ? 'foto guardada' : 'fotos guardadas'}` : 'Todavía no hay fotos guardadas.'}</p></div>
         <div className="photo-toolbar-actions">
-          <button className="download-city-button" type="button" disabled={!indexReady || cityPhotoCount === 0 || exportBusy} onClick={() => { void handleStartExport(); }}>
+          <button className="download-city-button" type="button" disabled={exportBusy} onClick={() => { void handleStartExport(); }}>
             {startingExport ? 'Iniciando…' : exportJob?.status === 'queued' || exportJob?.status === 'processing' ? 'Preparando ZIP…' : exportJob?.status === 'ready' ? 'Actualizar descarga' : exportJob?.status === 'expired' ? 'Preparar de nuevo' : 'Descargar ciudad'}
           </button>
-          <button className="upload-button" type="button" disabled={!indexReady || batchUploading} onClick={() => inputRef.current?.click()}>Agregar fotos</button>
+          <button className="upload-button" type="button" disabled={batchUploading} onClick={() => inputRef.current?.click()}>Agregar fotos</button>
         </div>
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={(event) => { void handleFiles(event); }} />
       </section>
@@ -511,8 +560,8 @@ function PhotosContent() {
       </div>}
 
       {galleryError && <p className="gallery-error" role="alert">{galleryError} <button type="button" onClick={() => { void refreshGallery(); }}>Reintentar</button></p>}
-      {!galleryError && (!indexReady || loadingPhotos) ? <>
-        <p className="gallery-loading">{!indexReady ? 'Preparando galería…' : 'Cargando fotos…'}</p>
+      <p className="gallery-load-status" role="status">{loadingPhotos ? photos.length > 0 ? 'Actualizando galería…' : 'Cargando fotos…' : ''}</p>
+      {!galleryError && loadingPhotos && photos.length === 0 ? <>
         <div className="photo-grid photo-grid-placeholder" aria-hidden="true">
           {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div className="photo-thumbnail" key={index}><span className="photo-thumbnail-placeholder">Cargando…</span></div>)}
         </div>
@@ -520,16 +569,16 @@ function PhotosContent() {
         <div className="photo-grid">
           {photos.map((photo) => <PhotoThumbnail photo={photo} onSelect={() => setSelectedPhoto(photo)} key={photo.photoId} />)}
         </div>
-        {nextCursor && <button className="load-more-photos" type="button" disabled={loadingMore} onClick={() => { void loadMorePhotos(); }}>{loadingMore ? 'Cargando…' : 'Cargar más fotos'}</button>}
+        {nextCursor && <button className="load-more-photos" type="button" disabled={loadingMore || loadingPhotos} onClick={() => { void loadMorePhotos(); }}>{loadingMore ? 'Cargando…' : 'Cargar más fotos'}</button>}
       </>}
     </>}
 
-    {selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} onDelete={async () => {
+    {hasPhotoAccess && selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} onDelete={async () => {
       await deleteCityPhoto(selectedPhoto);
       await deletePhotoIndex(selectedPhoto);
       await evictCachedPhotoBlobs([selectedPhoto.thumbnailPath, selectedPhoto.previewPath]);
       setPhotos((current) => current.filter((photo) => photo.photoId !== selectedPhoto.photoId));
-      setCityPhotoCount((current) => Math.max(0, current - 1));
+      setCityPhotoCount((current) => current === null ? null : Math.max(0, current - 1));
       setSelectedPhoto(null);
     }} />}
   </div>;

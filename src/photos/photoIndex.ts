@@ -4,22 +4,20 @@ import {
   doc,
   documentId,
   getCountFromServer,
-  getDoc,
-  getDocs,
+  getDocsFromCache,
+  getDocsFromServer,
   limit,
   orderBy,
   query,
   setDoc,
   startAfter,
-  writeBatch,
   type DocumentData,
+  type QuerySnapshot,
 } from 'firebase/firestore';
 import { photoDatabase } from '../firebase';
-import { listCityPhotos } from './photoStorage';
 import type { PhotoPageCursor, PhotoRecord } from './types';
 
 const TRIP_ID = 'japan-2026';
-const MIGRATION_ID = 'storage-photo-index-v1';
 
 function cityPhotos(cityId: string) {
   return collection(photoDatabase, `trips/${TRIP_ID}/cities/${cityId}/photos`);
@@ -69,14 +67,12 @@ export async function deletePhotoIndex(photo: PhotoRecord) {
   await deleteDoc(photoDocument(photo.cityId, photo.photoId));
 }
 
-export async function listCityPhotoPage(cityId: string, pageSize: number, cursor?: PhotoPageCursor) {
-  const constraints = [
-    orderBy('sortAt', 'desc'),
-    orderBy(documentId(), 'desc'),
-    ...(cursor ? [startAfter(cursor.sortAt, cursor.photoId)] : []),
-    limit(pageSize + 1),
-  ];
-  const snapshot = await getDocs(query(cityPhotos(cityId), ...constraints));
+export interface CityPhotoPage {
+  photos: PhotoRecord[];
+  nextCursor: PhotoPageCursor | null;
+}
+
+function photoPageFromSnapshot(snapshot: QuerySnapshot<DocumentData>, pageSize: number): CityPhotoPage {
   const pageDocuments = snapshot.docs.slice(0, pageSize);
   const photos = pageDocuments.map((entry) => photoFromData(entry.data()));
   const last = pageDocuments.at(-1);
@@ -86,26 +82,44 @@ export async function listCityPhotoPage(cityId: string, pageSize: number, cursor
   return { photos, nextCursor };
 }
 
+export async function listCityPhotoPage(
+  cityId: string,
+  pageSize: number,
+  cursor?: PhotoPageCursor,
+  onCachedPage?: (page: CityPhotoPage) => void,
+) {
+  const constraints = [
+    orderBy('sortAt', 'desc'),
+    orderBy(documentId(), 'desc'),
+    ...(cursor ? [startAfter(cursor.sortAt, cursor.photoId)] : []),
+    limit(pageSize + 1),
+  ];
+  const pageQuery = query(cityPhotos(cityId), ...constraints);
+  let serverFinished = false;
+  const cachedPage = getDocsFromCache(pageQuery).then((snapshot) => {
+    // Una caché vacía no demuestra que la ciudad esté vacía en el servidor.
+    if (snapshot.empty) return null;
+    const page = photoPageFromSnapshot(snapshot, pageSize);
+    if (!serverFinished) onCachedPage?.(page);
+    return page;
+  }).catch(() => null);
+
+  try {
+    const snapshot = await getDocsFromServer(pageQuery);
+    return photoPageFromSnapshot(snapshot, pageSize);
+  } catch (error) {
+    // Un permiso revocado no debe quedar oculto por la caché.
+    const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+    if (code === 'permission-denied' || code === 'unauthenticated') throw error;
+    const fallback = await cachedPage;
+    if (fallback) return fallback;
+    throw error;
+  } finally {
+    serverFinished = true;
+  }
+}
+
 export async function countIndexedCityPhotos(cityId: string) {
   return (await getCountFromServer(cityPhotos(cityId))).data().count;
 }
 
-export async function ensurePhotoIndex(cityIds: string[]) {
-  const marker = doc(photoDatabase, `trips/${TRIP_ID}/migrations/${MIGRATION_ID}`);
-  if ((await getDoc(marker)).exists()) return;
-
-  const photos = (await Promise.all(cityIds.map((cityId) => listCityPhotos(cityId)))).flat();
-  for (let offset = 0; offset < photos.length; offset += 400) {
-    const batch = writeBatch(photoDatabase);
-    photos.slice(offset, offset + 400).forEach((photo) => {
-      batch.set(photoDocument(photo.cityId, photo.photoId), serializablePhoto(photo));
-    });
-    await batch.commit();
-  }
-
-  await setDoc(marker, {
-    completedAt: new Date().toISOString(),
-    photoCount: photos.length,
-    version: 1,
-  });
-}
