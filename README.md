@@ -103,6 +103,14 @@ sin esperar al resto. Se guardan en Cache Storage porque sus rutas son inmutable
 una caché en memoria de hasta 32 MB evita releer los mismos archivos al navegar.
 Al borrar una foto también se elimina su copia local.
 
+El visor permite recorrer las fotos en el mismo orden con anterior/siguiente,
+las flechas del teclado o deslizando horizontalmente con un dedo sobre la imagen.
+Al llegar al final de las fotos cargadas, solicita la siguiente página sin cerrar
+el visor. Muestra la posición y el total cuando el conteo está disponible. Las
+vistas previas también se reutilizan desde la caché; no se precargan originales.
+La navegación se pausa durante una descarga individual o la confirmación de
+borrado, para mantener esas acciones asociadas a la foto visible.
+
 Firestore guarda los datos consultados en una caché persistente: al volver a una
 ciudad se muestran primero las fotos conocidas y se actualizan desde el servidor
 en segundo plano. Una actualización conserva la grilla visible. Los conteos y

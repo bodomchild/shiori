@@ -94,6 +94,8 @@ function PhotosContent() {
   const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [loadingPhotoCounts, setLoadingPhotoCounts] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoRecord | null>(null);
+  const [navigatingPhoto, setNavigatingPhoto] = useState(false);
+  const [viewerError, setViewerError] = useState<string | null>(null);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [exportJob, setExportJob] = useState<CityExportJob | null>(null);
   const [exportLinks, setExportLinks] = useState<CityExportLink[]>([]);
@@ -106,6 +108,10 @@ function PhotosContent() {
   const galleryScopeRef = useRef<string | null>(galleryScope);
   const galleryRequestRef = useRef(0);
   const countRequestRef = useRef(0);
+  const selectedPhotoRef = useRef<PhotoRecord | null>(null);
+  const viewerRequestRef = useRef(0);
+  const navigatingPhotoRef = useRef(false);
+  const moreRequestRef = useRef<number | null>(null);
   galleryScopeRef.current = galleryScope;
   const inFlight = useRef(new Set<string>());
   const statusTimers = useRef(new Map<string, number>());
@@ -179,27 +185,69 @@ function PhotosContent() {
     }
   }, [city, galleryScope, hasPhotoAccess]);
 
-  const loadMorePhotos = useCallback(async () => {
-    if (!hasPhotoAccess || !city || !nextCursor || loadingMore || loadingPhotos) return;
+  const loadMorePhotos = useCallback(async (): Promise<PhotoRecord[] | null> => {
+    if (!hasPhotoAccess || !city || !nextCursor || loadingPhotos || moreRequestRef.current !== null) return null;
     const requestId = galleryRequestRef.current;
     const isCurrent = () => galleryScopeRef.current === galleryScope && galleryRequestRef.current === requestId;
+    moreRequestRef.current = requestId;
     setLoadingMore(true);
     setGalleryError(null);
     try {
       const page = await listCityPhotoPage(city.id, pageSize, nextCursor);
-      if (!isCurrent()) return;
+      if (!isCurrent()) return null;
       setPhotos((current) => {
         const byId = new Map(current.map((photo) => [photo.photoId, photo]));
         page.photos.forEach((photo) => byId.set(photo.photoId, photo));
         return [...byId.values()].sort((left, right) => right.sortAt.localeCompare(left.sortAt) || right.photoId.localeCompare(left.photoId));
       });
       setNextCursor(page.nextCursor);
+      return page.photos;
     } catch (error) {
       if (isCurrent()) setGalleryError(galleryErrorMessage(error));
+      return null;
     } finally {
+      if (moreRequestRef.current === requestId) moreRequestRef.current = null;
       if (isCurrent()) setLoadingMore(false);
     }
-  }, [city, galleryScope, hasPhotoAccess, loadingMore, loadingPhotos, nextCursor, pageSize]);
+  }, [city, galleryScope, hasPhotoAccess, loadingPhotos, nextCursor, pageSize]);
+
+  const selectPhoto = useCallback((photo: PhotoRecord | null) => {
+    // Invalidar una navegación pendiente si se cierra el visor o se abre otra foto.
+    viewerRequestRef.current += 1;
+    selectedPhotoRef.current = photo;
+    navigatingPhotoRef.current = false;
+    setNavigatingPhoto(false);
+    setViewerError(null);
+    setSelectedPhoto(photo);
+  }, []);
+
+  async function navigatePhoto(direction: -1 | 1) {
+    const currentPhoto = selectedPhotoRef.current;
+    if (!currentPhoto || navigatingPhotoRef.current) return;
+    const index = photos.findIndex((photo) => photo.photoId === currentPhoto.photoId);
+    if (index < 0) return;
+    const adjacent = photos[index + direction];
+    if (adjacent) {
+      selectPhoto(adjacent);
+      return;
+    }
+    if (direction !== 1 || !nextCursor || loadingPhotos) return;
+
+    const requestId = ++viewerRequestRef.current;
+    navigatingPhotoRef.current = true;
+    setNavigatingPhoto(true);
+    setViewerError(null);
+    const page = await loadMorePhotos();
+    if (viewerRequestRef.current !== requestId) return;
+    navigatingPhotoRef.current = false;
+    setNavigatingPhoto(false);
+    if (page === null) {
+      setViewerError('No se pudieron cargar más fotos. Probá nuevamente con la flecha.');
+      return;
+    }
+    const nextPhoto = page.find((photo) => !photos.some((loaded) => loaded.photoId === photo.photoId));
+    if (nextPhoto) selectPhoto(nextPhoto);
+  }
 
   const processPending = useCallback(async (pending: PendingPhoto) => {
     if (!user || !hasPhotoAccess || inFlight.current.has(pending.id)) return;
@@ -274,14 +322,16 @@ function PhotosContent() {
     setCountFailed(false);
     setLoadingPhotos(false);
     setLoadingMore(false);
+    moreRequestRef.current = null;
     setGalleryError(null);
-    setSelectedPhoto(null);
+    selectPhoto(null);
     return () => {
       galleryScopeRef.current = null;
       galleryRequestRef.current += 1;
       countRequestRef.current += 1;
+      viewerRequestRef.current += 1;
     };
-  }, [galleryScope]);
+  }, [galleryScope, selectPhoto]);
 
   useEffect(() => { void refreshGallery(); }, [refreshGallery]);
   useEffect(() => { void refreshCityCount(); }, [refreshCityCount]);
@@ -452,6 +502,7 @@ function PhotosContent() {
   const batchErrors = batchStates.filter((state) => state === 'error').length;
   const batchUploading = batchActive + batchWaiting > 0;
   const exportBusy = startingExport || exportJob?.status === 'queued' || exportJob?.status === 'processing';
+  const selectedPhotoIndex = selectedPhoto ? photos.findIndex((photo) => photo.photoId === selectedPhoto.photoId) : -1;
   const exportPanel = (exportJob || exportError) && <section className="city-export" aria-live="polite">
     {startingExport ? <p>Iniciando la preparación de la descarga…</p> : exportJob?.status === 'queued' && <p>La descarga está en cola.</p>}
     {exportJob?.status === 'processing' && <p>Preparando archivos ZIP: {exportJob.completedParts} de {exportJob.partCount} listos. Podés cerrar la página y volver después.</p>}
@@ -567,20 +618,31 @@ function PhotosContent() {
         </div>
       </> : photos.length > 0 && <>
         <div className="photo-grid">
-          {photos.map((photo) => <PhotoThumbnail photo={photo} onSelect={() => setSelectedPhoto(photo)} key={photo.photoId} />)}
+          {photos.map((photo) => <PhotoThumbnail photo={photo} onSelect={() => selectPhoto(photo)} key={photo.photoId} />)}
         </div>
         {nextCursor && <button className="load-more-photos" type="button" disabled={loadingMore || loadingPhotos} onClick={() => { void loadMorePhotos(); }}>{loadingMore ? 'Cargando…' : 'Cargar más fotos'}</button>}
       </>}
     </>}
 
-    {hasPhotoAccess && selectedPhoto && <PhotoViewer photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} onDelete={async () => {
-      await deleteCityPhoto(selectedPhoto);
-      await deletePhotoIndex(selectedPhoto);
-      await evictCachedPhotoBlobs([selectedPhoto.thumbnailPath, selectedPhoto.previewPath]);
-      setPhotos((current) => current.filter((photo) => photo.photoId !== selectedPhoto.photoId));
-      setCityPhotoCount((current) => current === null ? null : Math.max(0, current - 1));
-      setSelectedPhoto(null);
-    }} />}
+    {hasPhotoAccess && selectedPhoto && <PhotoViewer photo={selectedPhoto}
+      onClose={() => selectPhoto(null)}
+      onNavigate={(direction) => { void navigatePhoto(direction); }}
+      hasPrevious={selectedPhotoIndex > 0}
+      hasNext={selectedPhotoIndex >= 0 && (
+        selectedPhotoIndex < photos.length - 1 || Boolean(nextCursor && !loadingPhotos && !loadingMore)
+      )}
+      position={Math.max(1, selectedPhotoIndex + 1)}
+      total={cityPhotoCount === null ? null : Math.max(cityPhotoCount, photos.length)}
+      navigating={navigatingPhoto}
+      navigationError={viewerError}
+      onDelete={async () => {
+        await deleteCityPhoto(selectedPhoto);
+        await deletePhotoIndex(selectedPhoto);
+        await evictCachedPhotoBlobs([selectedPhoto.thumbnailPath, selectedPhoto.previewPath]);
+        setPhotos((current) => current.filter((photo) => photo.photoId !== selectedPhoto.photoId));
+        setCityPhotoCount((current) => current === null ? null : Math.max(0, current - 1));
+        selectPhoto(null);
+      }} />}
   </div>;
 }
 

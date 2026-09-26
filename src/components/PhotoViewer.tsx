@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type TouchEvent } from 'react';
+import { loadGalleryPhotoBlob } from '../photos/photoCache';
 import { loadPhotoBlob } from '../photos/photoStorage';
 import type { PhotoRecord } from '../photos/types';
 
@@ -6,23 +7,23 @@ interface PhotoViewerProps {
   photo: PhotoRecord;
   onClose: () => void;
   onDelete: () => Promise<void>;
+  onNavigate: (direction: -1 | 1) => void;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  position: number;
+  total: number | null;
+  navigating: boolean;
+  navigationError: string | null;
 }
 
-export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+// Cada foto tiene su propia carga: una respuesta tardía no cambia la imagen actual.
+function PhotoPreview({ photo }: { photo: PhotoRecord }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
   useEffect(() => {
-    dialogRef.current?.showModal();
     let active = true;
     let objectUrl: string | null = null;
-    loadPhotoBlob(photo.previewPath).then((blob) => {
+    loadGalleryPhotoBlob(photo.previewPath).then((blob) => {
       if (!active) return;
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -32,6 +33,52 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [photo.previewPath]);
+
+  return url ? <img src={url} alt={photo.originalName} draggable={false} />
+    : <p role="status">{failed ? 'No se pudo abrir la foto.' : 'Cargando foto…'}</p>;
+}
+
+export default function PhotoViewer({ photo, onClose, onDelete, onNavigate, hasPrevious, hasNext, position, total, navigating, navigationError }: PhotoViewerProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const touchStart = useRef<{ x: number; y: number; id: number } | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const navigationBlocked = navigating || confirmingDelete || downloading || deleting;
+
+  useEffect(() => {
+    dialogRef.current?.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    setDownloadError(null);
+    setDeleteError(null);
+    touchStart.current = null;
+  }, [photo.photoId]);
+
+  function navigate(direction: -1 | 1) {
+    if (navigationBlocked || (direction === -1 ? !hasPrevious : !hasNext)) return;
+    onNavigate(direction);
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || event.touches.length > 0 || event.changedTouches.length !== 1) return;
+    const end = event.changedTouches[0];
+    if (end.identifier !== start.id) return;
+    const dx = end.clientX - start.x;
+    const dy = end.clientY - start.y;
+    // Ignorar toques, desplazamientos verticales y gestos con más de un dedo.
+    if (Math.abs(dx) >= 60 && Math.abs(dx) > Math.abs(dy) * 1.5) navigate(dx < 0 ? 1 : -1);
+  }
 
   async function handleDownload() {
     setDownloading(true);
@@ -62,17 +109,39 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
     }
   }
 
-  return <dialog className="photo-viewer" ref={dialogRef} onClose={onClose} onCancel={(event) => {
+  return <dialog className="photo-viewer" aria-label="Visor de fotos" ref={dialogRef} onClose={onClose} onKeyDown={(event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      navigate(event.key === 'ArrowLeft' ? -1 : 1);
+    }
+  }} onCancel={(event) => {
     if (deleting) event.preventDefault();
   }} onClick={(event) => {
     if (event.target === event.currentTarget && !deleting) event.currentTarget.close();
   }}>
     <div className="photo-viewer-content">
       <button className="photo-viewer-close" type="button" aria-label="Cerrar foto" disabled={deleting} onClick={() => dialogRef.current?.close()}>×</button>
-      {url ? <img src={url} alt={photo.originalName} /> : <p>{failed ? 'No se pudo abrir la foto.' : 'Cargando foto…'}</p>}
+      <div className="photo-viewer-stage" onTouchStart={(event) => {
+        const touch = event.touches[0];
+        touchStart.current = !navigationBlocked && event.touches.length === 1
+          ? { x: touch.clientX, y: touch.clientY, id: touch.identifier } : null;
+      }} onTouchEnd={handleTouchEnd} onTouchCancel={() => { touchStart.current = null; }}>
+        <PhotoPreview photo={photo} key={photo.photoId} />
+      </div>
+      <div className="photo-viewer-navigation" aria-label="Navegación de fotos">
+        <button type="button" aria-label="Foto anterior" disabled={!hasPrevious || navigationBlocked} onClick={() => navigate(-1)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="m15 6-6 6 6 6" /></svg>
+        </button>
+        <span role="status">{navigating ? 'Cargando más fotos…' : `Foto ${position}${total === null ? '' : ` de ${total}`}`}</span>
+        <button type="button" aria-label="Foto siguiente" disabled={!hasNext || navigationBlocked} onClick={() => navigate(1)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6" /></svg>
+        </button>
+      </div>
+      {navigationError && <p className="photo-viewer-error" role="alert">{navigationError}</p>}
       {!confirmingDelete ? <div className="photo-viewer-actions">
-        {url && <button type="button" disabled={downloading} onClick={() => { void handleDownload(); }}>{downloading ? 'Descargando…' : 'Descargar original'}</button>}
-        <button className="photo-delete-button" type="button" onClick={() => setConfirmingDelete(true)}>Eliminar foto</button>
+        <button type="button" disabled={downloading || navigating} onClick={() => { void handleDownload(); }}>{downloading ? 'Descargando…' : 'Descargar original'}</button>
+        <button className="photo-delete-button" type="button" disabled={downloading || navigating} onClick={() => setConfirmingDelete(true)}>Eliminar foto</button>
         {downloadError && <span className="photo-download-error" role="alert">{downloadError}</span>}
       </div> : <div className="photo-delete-confirm" role="alertdialog" aria-labelledby="delete-photo-title" aria-describedby="delete-photo-description">
         <strong id="delete-photo-title">¿Eliminar esta foto?</strong>
