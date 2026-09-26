@@ -118,6 +118,11 @@ Storage y escriben las partes en el bucket temporal
 `shiori-japan-2026-exports`. La app muestra el avance y enlaces temporales cuando
 termina. El bucket debe borrar automáticamente sus objetos a las 48 horas.
 
+Para firmar esos enlaces, la cuenta de ejecución
+`836274225500-compute@developer.gserviceaccount.com` necesita el rol **Creador de
+tokens de cuenta de servicio** (`roles/iam.serviceAccountTokenCreator`). Puede
+concederse desde IAM a esa misma cuenta; no hace públicos los ZIP ni las fotos.
+
 Para desarrollar y verificar toda la galería:
 
 ```sh
