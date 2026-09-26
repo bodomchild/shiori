@@ -1,4 +1,5 @@
 import type { ItineraryStop } from '../types/itinerary';
+import ArrowUpRight from './ArrowUpRight';
 
 interface Props {
   stops: ItineraryStop[];
@@ -27,7 +28,7 @@ export default function StopList({ stops, selectedStopId, completedStopIds, onSe
               {stop.optional && <span className="optional-badge">Opcional</span>}
               {stop.notes && <span className="stop-note">{stop.notes}</span>}
               {isSelected && stop.address && <span className="stop-address">{stop.address}</span>}
-              {isSelected && <span className="selected-label">{stop.coordinates ? 'Seleccionada en el mapa ↗' : 'Ubicación por confirmar'}</span>}
+              {isSelected && <span className="selected-label">{stop.coordinates ? <>Seleccionada en el mapa <ArrowUpRight /></> : 'Ubicación por confirmar'}</span>}
             </span>
           </button>
           <div className="stop-actions">
@@ -35,7 +36,7 @@ export default function StopList({ stops, selectedStopId, completedStopIds, onSe
               <input type="checkbox" checked={isCompleted} onChange={() => onToggleCompleted(stop.id)} />
               <span>{isCompleted ? 'Realizada' : 'Marcar realizada'}</span>
             </label>
-            {stop.coordinates && <a className="maps-link" href={googleMapsUrl(stop)} target="_blank" rel="noreferrer" aria-label={`Abrir ${stop.name} en Google Maps`}>Abrir en Google Maps <span aria-hidden="true">↗</span></a>}
+            {stop.coordinates && <a className="maps-link" href={googleMapsUrl(stop)} target="_blank" rel="noreferrer" aria-label={`Abrir ${stop.name} en Google Maps`}>Abrir en Google Maps <ArrowUpRight /></a>}
           </div>
         </div>
       </li>;

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ArrowUpRight from '../components/ArrowUpRight';
 import { itinerary } from '../data/itinerary';
 import { cityDates, closestTripDay, daySlug, formatDate, tripDayPath, tripDays } from '../dates';
 import { loadLastOpenedDay } from '../storage';
@@ -41,7 +42,7 @@ export default function TripPage() {
       <div className="city-grid">
         {itinerary.cities.map((city, index) => <Link className={`city-card city-tone-${index % 3}`} to={`/${city.id}`} key={city.id}>
           <div className="flex items-start justify-between"><span className="city-number">{String(index + 1).padStart(2, '0')}</span><span className="city-character" aria-hidden="true" lang="ja">{cityCharacters[index]}</span></div>
-          <div className="city-card-bottom"><div><h3>{city.name}</h3><p>{formatDate(city.startDate)} — {formatDate(city.endDate)} <span>· {cityDates(city).length} días</span></p></div><span className="circle-arrow" aria-hidden="true">↗</span></div>
+          <div className="city-card-bottom"><div><h3>{city.name}</h3><p>{formatDate(city.startDate)} — {formatDate(city.endDate)} <span>· {cityDates(city).length} días</span></p></div><span className="circle-arrow" aria-hidden="true"><ArrowUpRight /></span></div>
         </Link>)}
       </div>
     </section>

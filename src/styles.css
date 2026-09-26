@@ -53,6 +53,7 @@ main:focus { outline: none; }
 .city-card p { font-size: 11px; color: #656d5e; margin: 0; }
 .city-card p span { white-space: nowrap; }
 .circle-arrow { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #9ca68f; border-radius: 50%; font-size: 19px; flex-shrink: 0; color: #4a5940; }
+.arrow-up-right { display: inline-block; width: 1em; height: 1em; flex-shrink: 0; vertical-align: -.12em; }
 .sample-note { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; border-top: 1px solid #ddded3; padding-block: 24px 10px; }
 .trip-days { scroll-margin-top: 16px; padding-block: 30px 36px; border-top: 1px solid #ddded3; }
 .trip-day-groups { display: grid; gap: 16px; }
