@@ -13,6 +13,8 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -20,7 +22,7 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
     dialogRef.current?.showModal();
     let active = true;
     let objectUrl: string | null = null;
-    loadPhotoBlob(photo.originalPath).then((blob) => {
+    loadPhotoBlob(photo.previewPath).then((blob) => {
       if (!active) return;
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -29,7 +31,25 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [photo.originalPath]);
+  }, [photo.previewPath]);
+
+  async function handleDownload() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const blob = await loadPhotoBlob(photo.originalPath);
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = photo.originalName;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    } catch {
+      setDownloadError('No se pudo descargar el original. Probá nuevamente.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -49,10 +69,11 @@ export default function PhotoViewer({ photo, onClose, onDelete }: PhotoViewerPro
   }}>
     <div className="photo-viewer-content">
       <button className="photo-viewer-close" type="button" aria-label="Cerrar foto" disabled={deleting} onClick={() => dialogRef.current?.close()}>×</button>
-      {url ? <img src={url} alt={photo.originalName} /> : <p>{failed ? 'No se pudo abrir el original.' : 'Cargando foto original…'}</p>}
+      {url ? <img src={url} alt={photo.originalName} /> : <p>{failed ? 'No se pudo abrir la foto.' : 'Cargando foto…'}</p>}
       {!confirmingDelete ? <div className="photo-viewer-actions">
-        {url && <a href={url} download={photo.originalName}>Descargar original</a>}
+        {url && <button type="button" disabled={downloading} onClick={() => { void handleDownload(); }}>{downloading ? 'Descargando…' : 'Descargar original'}</button>}
         <button className="photo-delete-button" type="button" onClick={() => setConfirmingDelete(true)}>Eliminar foto</button>
+        {downloadError && <span className="photo-download-error" role="alert">{downloadError}</span>}
       </div> : <div className="photo-delete-confirm" role="alertdialog" aria-labelledby="delete-photo-title" aria-describedby="delete-photo-description">
         <strong id="delete-photo-title">¿Eliminar esta foto?</strong>
         <p id="delete-photo-description">Se quitará de la galería. Podrá recuperarse desde Cloud Storage durante 30 días.</p>

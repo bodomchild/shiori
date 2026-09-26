@@ -1,5 +1,7 @@
 import { getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -14,4 +16,6 @@ const firebaseConfig = {
 const app = getApps()[0] ?? initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+export const photoDatabase = getFirestore(app);
+export const photoFunctions = getFunctions(app, 'us-central1');
 export const photoStorage = getStorage(app);

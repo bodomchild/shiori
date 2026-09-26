@@ -37,10 +37,11 @@ before(async () => {
 beforeEach(async () => testEnvironment.clearStorage());
 after(async () => testEnvironment.cleanup());
 
-test('Fer puede crear, leer y listar originales y vistas previas válidas', async () => {
+test('Fer puede crear, leer y listar originales, miniaturas y vistas previas válidas', async () => {
   const storage = testEnvironment.authenticatedContext(FER_UID).storage();
   const base = 'trips/japan-2026/photos/osaka/photo-1';
   await assertSucceeds(uploadBytes(ref(storage, `${base}/original`), new Uint8Array([1, 2]), metadata('osaka', 'photo-1')));
+  await assertSucceeds(uploadBytes(ref(storage, `${base}/thumbnail.jpg`), new Uint8Array([2]), metadata('osaka', 'photo-1')));
   await assertSucceeds(uploadBytes(ref(storage, `${base}/preview.jpg`), new Uint8Array([3]), metadata('osaka', 'photo-1')));
   await assertSucceeds(getMetadata(ref(storage, `${base}/original`)));
   await assertSucceeds(list(ref(storage, 'trips/japan-2026/photos/osaka')));
@@ -86,15 +87,24 @@ test('rechaza vistas previas mayores a 2 MB', async () => {
   await assertFails(uploadBytes(ref(storage, 'trips/japan-2026/photos/osaka/photo-preview/preview.jpg'), oversized, metadata('osaka', 'photo-preview')));
 });
 
+test('rechaza miniaturas mayores a 512 KB', async () => {
+  const storage = testEnvironment.authenticatedContext(FER_UID).storage();
+  const oversized = new Uint8Array(512 * 1024 + 1);
+  await assertFails(uploadBytes(ref(storage, 'trips/japan-2026/photos/osaka/photo-thumbnail/thumbnail.jpg'), oversized, metadata('osaka', 'photo-thumbnail')));
+});
+
 test('una cuenta autorizada puede borrar ambos archivos de una foto, pero no sobrescribirlos', async () => {
   const storage = testEnvironment.authenticatedContext(FER_UID).storage();
   const base = 'trips/japan-2026/photos/osaka/photo-7';
   const original = ref(storage, `${base}/original`);
+  const thumbnail = ref(storage, `${base}/thumbnail.jpg`);
   const preview = ref(storage, `${base}/preview.jpg`);
   await assertSucceeds(uploadBytes(original, new Uint8Array([1]), metadata('osaka', 'photo-7')));
+  await assertSucceeds(uploadBytes(thumbnail, new Uint8Array([2]), metadata('osaka', 'photo-7')));
   await assertSucceeds(uploadBytes(preview, new Uint8Array([2]), metadata('osaka', 'photo-7')));
   await assertFails(uploadBytes(original, new Uint8Array([3]), metadata('osaka', 'photo-7')));
   await assertSucceeds(deleteObject(original));
+  await assertSucceeds(deleteObject(thumbnail));
   await assertSucceeds(deleteObject(preview));
 });
 

@@ -42,11 +42,14 @@ service firebase.storage {
           || (fileName == 'preview.jpg'
             && request.resource.contentType == 'image/jpeg'
             && request.resource.size <= 2 * 1024 * 1024)
+          || (fileName == 'thumbnail.jpg'
+            && request.resource.contentType == 'image/jpeg'
+            && request.resource.size <= 512 * 1024)
         );
 
       allow delete: if isAllowedUser()
         && isValidCity(cityId)
-        && fileName in ['original', 'preview.jpg']
+        && fileName in ['original', 'preview.jpg', 'thumbnail.jpg']
         && hasValidStoredMetadata(cityId, photoId);
 
       // Los objetos siguen siendo inmutables: nunca se sobrescriben.

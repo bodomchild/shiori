@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "test:photos": "node --experimental-strip-types --test tests/captureDate.test.ts",
-    "test:storage": "npx firebase-tools@15.30.1 emulators:exec --only storage \"node --test tests/storage.rules.test.mjs\""
+    "test:storage": "npx firebase-tools@15.30.1 emulators:exec --only storage \"node --test tests/storage.rules.test.mjs\"",
+    "test:firestore": "npx firebase-tools@15.30.1 emulators:exec --only firestore \"node --test tests/firestore.rules.test.mjs\""
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0",

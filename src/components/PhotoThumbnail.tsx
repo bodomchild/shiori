@@ -9,7 +9,7 @@ export default function PhotoThumbnail({ photo, onSelect }: { photo: PhotoRecord
   useEffect(() => {
     let active = true;
     let objectUrl: string | null = null;
-    loadPhotoBlob(photo.previewPath).then((blob) => {
+    loadPhotoBlob(photo.thumbnailPath ?? photo.previewPath).then((blob) => {
       if (!active) return;
       objectUrl = URL.createObjectURL(blob);
       setUrl(objectUrl);
@@ -18,7 +18,7 @@ export default function PhotoThumbnail({ photo, onSelect }: { photo: PhotoRecord
       active = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [photo.previewPath]);
+  }, [photo.previewPath, photo.thumbnailPath]);
 
   return <button className="photo-thumbnail" type="button" onClick={onSelect} disabled={!url}>
     {url ? <img src={url} alt={photo.originalName} loading="lazy" /> : <span>{failed ? 'No se pudo cargar' : 'Cargando…'}</span>}

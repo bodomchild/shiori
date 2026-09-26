@@ -1,9 +1,10 @@
 # Shiori · Japón, Lore & Fer
 
 Una web estática para consultar el viaje del 13 de octubre al 4 de noviembre.
-React + TypeScript + Vite, React Router, Tailwind CSS, Leaflet y Firebase. No
-hay backend propio ni base de datos. Firebase Authentication y Cloud Storage se
-usan exclusivamente para la galería privada del viaje.
+React + TypeScript + Vite, React Router, Tailwind CSS, Leaflet y Firebase. El
+itinerario sigue siendo una SPA estática. La galería privada usa Firebase
+Authentication, Cloud Storage, Firestore y pequeñas Cloud Functions para poder
+crecer a miles de fotos y preparar descargas por ciudad.
 
 Versión publicada: <https://bodomchild.github.io/shiori/>
 
@@ -51,8 +52,10 @@ ejecutarse manualmente desde la pestaña Actions del repositorio.
   actividades realizadas.
 - `src/firebase.ts`: configuración pública de la aplicación web de Firebase.
 - `src/auth/`: sesión de Google utilizada para proteger las fotos.
-- `storage.rules`: reglas de Cloud Storage, cerradas por defecto hasta registrar
-  las dos cuentas autorizadas.
+- `src/photos/`: subida, miniaturas, paginación, índice y exportaciones.
+- `functions/`: backend de indexación y generación de ZIP por ciudad.
+- `storage.rules` y `firestore.rules`: acceso limitado a las dos cuentas
+  autorizadas.
 
 Tocar una actividad centra y resalta su marker. Tocar un marker selecciona y
 muestra su actividad. «Ver todo el día» vuelve a encuadrar todas las paradas.
@@ -68,18 +71,27 @@ La ruta `/#/photos` permite que Lore y Fer ingresen con Google. Cada ciudad tien
 su propia galería y también puede abrirse desde sus días. Las fotos se asocian
 solamente por `cityId`; no se vinculan a fechas ni actividades.
 
-Antes de cada subida se guarda una copia temporal en IndexedDB. La app genera
-una vista previa JPEG y sube como máximo dos fotos en paralelo. Si se pierde la
-conexión, conserva lo pendiente en ese navegador y reintenta al volver a estar
-online. El original admite hasta 30 MB y no se modifica. La vista previa admite
-hasta 2 MB. Cloud Storage es la fuente definitiva una vez confirmada la subida.
+Antes de cada subida se guarda una copia temporal en IndexedDB. La app procesa
+y sube como máximo dos fotos en paralelo, de modo que una selección grande no
+quede completa en memoria. Si se pierde la conexión, conserva lo pendiente en
+ese navegador y reintenta al volver a estar online. El original admite hasta
+30 MB y no se modifica. Se generan una miniatura de hasta 512 KB para la grilla
+y una vista previa de hasta 2 MB para el visor. El original solo se descarga
+cuando se toca «Descargar original».
 
 Los objetos se guardan en:
 
 ```text
 trips/japan-2026/photos/{cityId}/{photoId}/original
+trips/japan-2026/photos/{cityId}/{photoId}/thumbnail.jpg
 trips/japan-2026/photos/{cityId}/{photoId}/preview.jpg
 ```
+
+Cloud Storage sigue siendo la fuente definitiva. Firestore guarda un índice
+reconstruible con el orden, las rutas y el tamaño. La galería lee 50 fotos por
+página y obtiene el total sin recorrer todo el bucket. La primera sesión después
+de habilitar Firestore migra automáticamente las fotos anteriores; las Cloud
+Functions mantienen el índice ante futuras subidas y borrados.
 
 Las fotos nuevas se ordenan desde la captura más reciente. La app lee la fecha
 EXIF cuando está disponible y usa la fecha del archivo o de subida como respaldo;
@@ -87,23 +99,43 @@ las fotos anteriores continúan funcionando con su fecha de subida.
 
 `storage.rules` limita el acceso a los UID declarados, valida ciudad, tipo,
 tamaño y metadatos, no permite sobrescribir archivos y limita el borrado a las
-cuentas autorizadas. Al borrar una foto, la aplicación elimina su original y su
-vista previa; la política de Soft Delete del bucket permite recuperarlos durante
-30 días.
-Después de agregar o modificar los UID, probar y publicar las reglas con:
+cuentas autorizadas. `firestore.rules` protege el índice y permite que cada
+persona lea solamente las exportaciones que pidió. Al borrar una foto, la
+aplicación elimina original, miniatura, vista previa e índice; la política de
+Soft Delete del bucket permite recuperar los archivos durante 30 días.
+
+El botón «Descargar ciudad» crea ZIP de aproximadamente 1,5 GB para que una
+ciudad con decenas de GB no dependa de una única tarea enorme. Las tareas leen
+los originales directamente desde Storage y escriben las partes en el bucket
+temporal `shiori-japan-2026-exports`. La app muestra el avance y enlaces
+temporales cuando termina. El bucket debe borrar automáticamente sus objetos a
+las 48 horas.
+
+Para desarrollar y verificar toda la galería:
 
 ```sh
 npm run test:storage
-npx firebase-tools@15.30.1 deploy --only storage
+npm run test:firestore
+cd functions
+npm ci
+npm run build
+```
+
+Las funciones se ejecutan en Node 22, que es el runtime estable admitido por
+Cloud Functions. La web puede desarrollarse con Node 24; por eso npm muestra una
+advertencia de `engines` al instalar `functions/` localmente, pero el código se
+compila correctamente. Las dependencias del backend están fijadas en
+`functions/package-lock.json`.
+
+Después de configurar Firestore y el bucket temporal, publicar con:
+
+```sh
+npx firebase-tools@15.30.1 deploy --only firestore,storage,functions
 ```
 
 `@firebase/rules-unit-testing` es solamente una dependencia de desarrollo y no
-se incluye en el JavaScript que recibe el navegador. Para evitar instalar cientos
-de paquetes permanentes, la CLI se ejecutará puntualmente con la versión fijada:
-
-```sh
-npx firebase-tools@15.30.1 deploy --only storage
-```
+se incluye en el JavaScript que recibe el navegador. La CLI se ejecuta
+puntualmente con la versión fijada para evitar cambios inesperados.
 
 `cors.json` habilita la lectura autenticada de imágenes desde GitHub Pages y los
 dos orígenes locales de desarrollo. Se aplica una vez al bucket con Google Cloud

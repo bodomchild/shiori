@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAllowedUser() {
+      return request.auth != null
+        && request.auth.uid in [
+          '8ew8WV6wdVWGDeyYet2LC4VIK3n2',
+          'HnuScK26yENhDdMC37HEfzYLzsE3'
+        ];
+    }
+
+    function isValidCity(cityId) {
+      return cityId in ['osaka', 'kyoto', 'kanazawa', 'kawaguchiko', 'hakone', 'tokyo'];
+    }
+
+    function isValidPhoto(cityId, photoId) {
+      let data = request.resource.data;
+      return data.keys().hasAll([
+          'photoId', 'cityId', 'originalPath', 'previewPath', 'originalName',
+          'createdAt', 'sortAt', 'uploaderUid', 'originalSize'
+        ])
+        && data.keys().hasOnly([
+          'photoId', 'cityId', 'originalPath', 'previewPath', 'thumbnailPath',
+          'originalName', 'createdAt', 'capturedAt', 'sortAt', 'uploaderUid',
+          'originalSize'
+        ])
+        && data.photoId == photoId
+        && data.cityId == cityId
+        && data.originalPath == 'trips/japan-2026/photos/' + cityId + '/' + photoId + '/original'
+        && data.previewPath == 'trips/japan-2026/photos/' + cityId + '/' + photoId + '/preview.jpg'
+        && (!data.keys().hasAny(['thumbnailPath'])
+          || data.thumbnailPath == 'trips/japan-2026/photos/' + cityId + '/' + photoId + '/thumbnail.jpg')
+        && data.originalName is string
+        && data.createdAt is string
+        && (!data.keys().hasAny(['capturedAt']) || data.capturedAt is string)
+        && data.sortAt is string
+        && data.uploaderUid in [
+          '8ew8WV6wdVWGDeyYet2LC4VIK3n2',
+          'HnuScK26yENhDdMC37HEfzYLzsE3'
+        ]
+        && data.originalSize is int
+        && data.originalSize >= 0
+        && data.originalSize <= 30 * 1024 * 1024;
+    }
+
+    match /trips/japan-2026/cities/{cityId}/photos/{photoId} {
+      allow read: if isAllowedUser() && isValidCity(cityId);
+      allow create, update: if isAllowedUser() && isValidCity(cityId) && isValidPhoto(cityId, photoId);
+      allow delete: if isAllowedUser() && isValidCity(cityId);
+    }
+
+    match /trips/japan-2026/migrations/storage-photo-index-v1 {
+      allow read, write: if isAllowedUser();
+    }
+
+    match /trips/japan-2026/exports/{jobId} {
+      allow read: if isAllowedUser() && resource.data.createdBy == request.auth.uid;
+      allow write: if false;
+
+      match /parts/{partId} {
+        allow read: if isAllowedUser()
+          && get(/databases/$(database)/documents/trips/japan-2026/exports/$(jobId)).data.createdBy == request.auth.uid;
+        allow write: if false;
+      }
+    }
+  }
+}

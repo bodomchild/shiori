@@ -1,8 +1,18 @@
 {
+  "functions": {
+    "source": "functions"
+  },
   "storage": {
     "rules": "storage.rules"
   },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
   "emulators": {
+    "firestore": {
+      "port": 8180
+    },
     "storage": {
       "port": 9199
     },
