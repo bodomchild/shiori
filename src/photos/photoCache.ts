@@ -46,13 +46,11 @@ async function loadAndCache(path: string) {
   }
   const blob = await queuedDownload(path);
   if (cache) {
-    try {
-      await cache.put(cacheRequest(path), new Response(blob, {
+    void cache.put(cacheRequest(path), new Response(blob, {
         headers: { 'Content-Type': blob.type || 'image/jpeg' },
-      }));
-    } catch {
+      })).catch(() => {
       // Una cuota llena no impide mostrar la miniatura ya descargada.
-    }
+      });
   }
   return blob;
 }

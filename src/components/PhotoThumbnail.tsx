@@ -20,7 +20,7 @@ export default function PhotoThumbnail({ photo, onSelect }: { photo: PhotoRecord
         setShouldLoad(true);
         observer.disconnect();
       }
-    }, { rootMargin: '400px' });
+    }, { rootMargin: '160px' });
     observer.observe(element);
     return () => observer.disconnect();
   }, [photoPath]);

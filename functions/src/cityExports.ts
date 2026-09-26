@@ -191,15 +191,25 @@ export const processCityExport = onTaskDispatched({
       output.on('finish', resolve);
       output.on('error', reject);
       archive.on('error', reject);
+      archive.on('warning', reject);
       archive.pipe(output);
-      photos.forEach((photo, index) => {
+
+      let nextPhotoIndex = 0;
+      const appendNextPhoto = () => {
+        if (nextPhotoIndex >= photos.length) {
+          void archive.finalize().catch(reject);
+          return;
+        }
+        const index = nextPhotoIndex++;
+        const photo = photos[index];
         const source = getStorage().bucket().file(photo.originalPath).createReadStream();
         source.on('error', reject);
         archive.append(source, {
           name: safeFileName(photo.originalName, index),
         });
-      });
-      void archive.finalize();
+      };
+      archive.on('entry', appendNextPhoto);
+      appendNextPhoto();
     });
 
     const [metadata] = await outputFile.getMetadata();
@@ -240,15 +250,20 @@ export const getCityExportLinks = onCall({ region: REGION, timeoutSeconds: 120 }
 
   const parts = await job.collection('parts').orderBy('index', 'asc').get();
   const expires = Date.now() + 60 * 60 * 1000;
-  const links = await Promise.all(parts.docs.map(async (entry) => {
-    const fileName = String(entry.get('fileName'));
-    const [url] = await getStorage().bucket(EXPORT_BUCKET).file(String(entry.get('objectPath'))).getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires,
-      responseDisposition: `attachment; filename="${fileName}"`,
-    });
-    return { fileName, size: Number(entry.get('size') || 0), url };
-  }));
-  return { links, expiresAt: new Date(expires).toISOString() };
+  try {
+    const links = await Promise.all(parts.docs.map(async (entry) => {
+      const fileName = String(entry.get('fileName'));
+      const [url] = await getStorage().bucket(EXPORT_BUCKET).file(String(entry.get('objectPath'))).getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires,
+        responseDisposition: `attachment; filename="${fileName}"`,
+      });
+      return { fileName, size: Number(entry.get('size') || 0), url };
+    }));
+    return { links, expiresAt: new Date(expires).toISOString() };
+  } catch (error) {
+    console.error('No se pudieron firmar los enlaces de exportación.', error);
+    throw new HttpsError('internal', 'No se pudieron generar los enlaces de descarga. Probá nuevamente en unos minutos.');
+  }
 });

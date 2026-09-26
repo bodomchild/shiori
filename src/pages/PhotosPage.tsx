@@ -51,6 +51,15 @@ function uploadErrorMessage(error: unknown) {
   return 'No se pudo subir la foto. Quedó guardada para reintentar.';
 }
 
+function exportErrorMessage(error: unknown) {
+  const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : '';
+  if (!navigator.onLine) return 'No hay conexión. Probá nuevamente cuando vuelva internet.';
+  if (code.includes('permission-denied')) return 'Esta cuenta no tiene permiso para preparar descargas.';
+  if (code.includes('internal')) return 'No pudimos generar los enlaces de descarga. Probá nuevamente en unos minutos.';
+  if (error instanceof Error && error.message && !/internal(?:\[500\])?/i.test(error.message)) return error.message;
+  return 'No se pudo preparar la descarga. Probá nuevamente.';
+}
+
 function formatBytes(bytes: number) {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
   if (bytes >= 1024 ** 2) return `${Math.ceil(bytes / 1024 ** 2)} MB`;
@@ -83,6 +92,7 @@ function PhotosContent() {
   const [loadingExportLinks, setLoadingExportLinks] = useState(false);
   const [linksRequestedFor, setLinksRequestedFor] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const exportStartingRef = useRef(false);
   const inFlight = useRef(new Set<string>());
   const statusTimers = useRef(new Map<string, number>());
 
@@ -242,19 +252,16 @@ function PhotosContent() {
     }
 
     let active = true;
+    let remaining = itinerary.cities.length;
+    setPhotoCounts({});
     setLoadingPhotoCounts(true);
-    void Promise.allSettled(itinerary.cities.map(async (entry) => ({
-      cityId: entry.id,
-      count: await countIndexedCityPhotos(entry.id),
-    }))).then((results) => {
-      if (!active) return;
-      const counts: Record<string, number> = {};
-      results.forEach((result) => {
-        if (result.status === 'fulfilled') counts[result.value.cityId] = result.value.count;
+    itinerary.cities.forEach((entry) => {
+      void countIndexedCityPhotos(entry.id).then((count) => {
+        if (active) setPhotoCounts((current) => ({ ...current, [entry.id]: count }));
+      }).finally(() => {
+        remaining -= 1;
+        if (active && remaining === 0) setLoadingPhotoCounts(false);
       });
-      setPhotoCounts(counts);
-    }).finally(() => {
-      if (active) setLoadingPhotoCounts(false);
     });
 
     return () => { active = false; };
@@ -281,7 +288,7 @@ function PhotosContent() {
 
   useEffect(() => {
     if (!user || !exportJobId) return;
-    return subscribeToCityExport(exportJobId, setExportJob, (error) => setExportError(uploadErrorMessage(error)));
+    return subscribeToCityExport(exportJobId, setExportJob, (error) => setExportError(exportErrorMessage(error)));
   }, [exportJobId, user]);
 
   const refreshExportLinks = useCallback(async () => {
@@ -292,7 +299,7 @@ function PhotosContent() {
     try {
       setExportLinks((await getCityExportLinks(exportJobId)).links);
     } catch (error) {
-      setExportError(uploadErrorMessage(error));
+      setExportError(exportErrorMessage(error));
     } finally {
       setLoadingExportLinks(false);
     }
@@ -303,18 +310,37 @@ function PhotosContent() {
   }, [exportJob?.status, exportJobId, linksRequestedFor, refreshExportLinks]);
 
   async function handleStartExport() {
-    if (!user || startingExport) return;
+    if (!user || exportStartingRef.current) return;
+    exportStartingRef.current = true;
     setStartingExport(true);
     setExportError(null);
     setExportLinks([]);
     setLinksRequestedFor(null);
+    setExportJob({
+      id: 'starting',
+      status: 'queued',
+      scope: exportScope,
+      photoCount: city ? cityPhotoCount : totalTripPhotos,
+      partCount: 0,
+      completedParts: 0,
+    });
     try {
       const result = await startCityExport(exportScope);
       localStorage.setItem(`shiori:photo-export:${exportScope}`, result.jobId);
+      setExportJob({
+        id: result.jobId,
+        status: 'queued',
+        scope: exportScope,
+        photoCount: city ? cityPhotoCount : totalTripPhotos,
+        partCount: result.partCount,
+        completedParts: 0,
+      });
       setExportJobId(result.jobId);
     } catch (error) {
-      setExportError(uploadErrorMessage(error));
+      setExportJob(null);
+      setExportError(exportErrorMessage(error));
     } finally {
+      exportStartingRef.current = false;
       setStartingExport(false);
     }
   }
@@ -379,7 +405,7 @@ function PhotosContent() {
   const batchUploading = batchActive + batchWaiting > 0;
   const exportBusy = startingExport || exportJob?.status === 'queued' || exportJob?.status === 'processing';
   const exportPanel = (exportJob || exportError) && <section className="city-export" aria-live="polite">
-    {exportJob?.status === 'queued' && <p>La descarga está en cola.</p>}
+    {startingExport ? <p>Iniciando la preparación de la descarga…</p> : exportJob?.status === 'queued' && <p>La descarga está en cola.</p>}
     {exportJob?.status === 'processing' && <p>Preparando archivos ZIP: {exportJob.completedParts} de {exportJob.partCount} listos. Podés cerrar la página y volver después.</p>}
     {exportJob?.status === 'ready' && <>
       <p>Descarga lista en {exportJob.partCount} {exportJob.partCount === 1 ? 'archivo' : 'archivos'}. Los enlaces duran una hora.</p>
@@ -415,7 +441,7 @@ function PhotosContent() {
     {!city && user && <>
       <section className="photo-all-export">
         <div><h2>Descargar todo el viaje</h2><p>Un ZIP por ciudad; las ciudades grandes se dividen en partes de hasta 4 GB o 500 fotos.</p></div>
-        <button className="download-city-button" type="button" disabled={!indexReady || loadingPhotoCounts || totalTripPhotos === 0 || exportBusy} onClick={() => { void handleStartExport(); }}>
+        <button className="download-city-button" type="button" disabled={!indexReady || (!loadingPhotoCounts && totalTripPhotos === 0) || exportBusy} onClick={() => { void handleStartExport(); }}>
           {startingExport ? 'Iniciando…' : exportJob?.status === 'queued' || exportJob?.status === 'processing' ? 'Preparando ZIP…' : exportJob?.status === 'ready' ? 'Actualizar descarga' : exportJob?.status === 'expired' ? 'Preparar de nuevo' : 'Descargar todo'}
         </button>
       </section>
@@ -485,7 +511,12 @@ function PhotosContent() {
       </div>}
 
       {galleryError && <p className="gallery-error" role="alert">{galleryError} <button type="button" onClick={() => { void refreshGallery(); }}>Reintentar</button></p>}
-      {!indexReady && !galleryError ? <p className="gallery-loading">Preparando galería…</p> : loadingPhotos ? <p className="gallery-loading">Cargando galería…</p> : photos.length > 0 && <>
+      {!galleryError && (!indexReady || loadingPhotos) ? <>
+        <p className="gallery-loading">{!indexReady ? 'Preparando galería…' : 'Cargando fotos…'}</p>
+        <div className="photo-grid photo-grid-placeholder" aria-hidden="true">
+          {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div className="photo-thumbnail" key={index}><span className="photo-thumbnail-placeholder">Cargando…</span></div>)}
+        </div>
+      </> : photos.length > 0 && <>
         <div className="photo-grid">
           {photos.map((photo) => <PhotoThumbnail photo={photo} onSelect={() => setSelectedPhoto(photo)} key={photo.photoId} />)}
         </div>
